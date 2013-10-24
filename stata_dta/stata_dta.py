@@ -22,7 +22,6 @@ VALID_NAME_RE = re.compile(r'^[_a-zA-Z][_a-zA-Z0-9]{0,31}$')
 RESERVED = frozenset(('_all', '_b', 'byte', '_coef', '_cons', 
             'double', 'float', 'if', 'in', 'int', 'long', '_n', '_N',
             '_pi', '_pred', '_rc', '_skip', 'using', 'with'))
-#STRING_TYPES_RE = re.compile(r'^str[0-9]+$')
 # next re used with _fix_fmt, which enlarges fmts for displaying value labels
 FMT_WIDTH_RE = re.compile(r'^\s*(%(-|~)?0?)([0-9]+)(\.[0-9]+)')
 LARGEST_NONMISSING = 8.988465674311579e+307
@@ -75,7 +74,6 @@ class Dta():
         #header
         self._ds_format  = old_dta._ds_format
         self._byteorder  = old_dta._byteorder
-        #self._filetype   = old_dta._filetype
         self._nvar       = len(sel_cols)
         self._nobs       = len(sel_rows)
         self._data_label = old_dta._data_label
@@ -176,38 +174,13 @@ class Dta():
         self._fullpath = address
         # http://stackoverflow.com/questions/8384737
         split_path = ntpath.split(address)
-        self._filename = split_path[1] or ntpath.basename(split_path[0])
-        
-    #def append_dta(self, others, generate=None, keep='_all', 
-    #              label=True, notes=True, force=False):
-    #    """append one or more Dta objects in others"""
-    #    if isinstance(others, Dta):
-    #        others = (others,)
-    #    elif (not isinstance(others, collections.Iterable) or
-    #            not all(isinstance(o, Dta) for o in others)):
-    #        raise TypeError("expecting Dta object or iterable of Dta objects")
-            
-    
-    #def append_file(self, others, generate=None, keep='_all',
-    #               label=True, notes=True, force=False):
-    #    raise NotImplementedError
-    
+        self._filename = split_path[1] or ntpath.basename(split_path[0])    
 
     def _set_timestamp(self):
         """make new time stamp"""
         d = datetime.now()
         self._time_stamp = "{:>2} {} {} {:>2}:{:>02}".format(
                         d.day, MONTH_ABBREV[d.month], d.year, d.hour, d.minute)
-            
-    #def _get_missing(self, value):
-    #    """return MissingValue instance for numbers in Stata's missing range;
-    #    this method only allows the 27 'standard' values ., .a, .b, etc"""
-    #    if value < 0 or value > 9.045521364627034e+307:
-    #        id = 0
-    #    else:
-    #        id = int(float(value).hex()[5:7], 16)
-    #        if id < 0 or id > 26: id = 0
-    #    return MISSING_VALS[id]
         
     def ismissing(self, item):
         """determine if item qualifies as a missing value"""
@@ -277,9 +250,6 @@ class Dta():
         matches = []
         append = matches.append
         if evars:
-            #matches = [[name, name] if name == '_dta' else 
-            #            [name] + [var for var in varlist if var.startswith(name)]
-            #                for name in split_names]
             for name in split_names:
                 if name == "_dta":
                     append([name, name])
@@ -287,8 +257,6 @@ class Dta():
                     match = [var for var in varlist if var.startswith(name)]
                     append([name, name] if name in match else [name] + match)
         else:
-            #matches = [[name] + [var for var in varlist if var.startswith(name)]
-            #      for name in split_names]
             for name in split_names:
                 match = [var for var in varlist if var.startswith(name)]
                 append([name, name] if name in match else [name] + match)
@@ -574,7 +542,6 @@ class Dta():
         
         """
         varnames = self._find_vars(varnames, empty_ok=False)
-        #vars_to_drop = [name for name in self._varlist if name not in varnames]
         vars_to_drop = set(self._varlist) - set(varnames)
         if len(vars_to_drop) > 0:
             self.drop_var(vars_to_drop)
@@ -891,8 +858,6 @@ class Dta():
             
         if nobs == 0:
             if do_return:
-                #__main__.return_values = {'N': 0, 'sum_w': 0, 'sum': 0, 
-                #                            'key_order': ('N', 'sum_w', 'sum')}
                 self._return_values = {'N': 0, 'sum_w': 0, 'sum': 0, 
                                             'key_order': ('N', 'sum_w', 'sum')}
             if meanonly or quietly:
@@ -912,7 +877,6 @@ class Dta():
             return
         
         if do_return:
-            #__main__.return_values = summary
             self._return_values = summary
             
         # if meanonly or quietly=True, nothing left to do
@@ -968,22 +932,6 @@ class Dta():
                     summary['p95'], prt_vals[-2], summary['skewness'], 
                     summary['p99'], prt_vals[-1], summary['kurtosis'])
                 )
-            
-            
-            #print("{txt}" + " "*(30 - floor(len(label)/2)) + label)
-            #print("{hline 61}")
-            #print("{txt}      Percentiles      Smallest")
-            #print("{{txt}} 1%    {{res}}{:>9g}      {}".format(summary['p1'], prt_vals[0]))
-            #print("{{txt}} 5%    {{res}}{:>9g}      {}".format(summary['p5'], prt_vals[1]))
-            #print("{{txt}}10%    {{res}}{:>9g}      {}       {{txt}}Obs          {{res}}{:>9d}".format(summary['p10'], prt_vals[2], summary['N']))
-            #print("{{txt}}25%    {{res}}{:>9g}      {}       {{txt}}Sum of Wgt.  {{res}}{:>9g}".format(summary['p25'], prt_vals[3], summary['sum_w']))
-            #print("")
-            #print("{{txt}}50%    {{res}}{:>9g}                      {{txt}}Mean         {{res}}{:>9g}".format(summary['p50'], summary['mean']))
-            #print("{{txt}}                        Largest       Std. Dev.    {{res}}{:>9g}".format(summary['sd']))
-            #print("{{txt}}75%    {{res}}{:>9g}      {}".format(summary['p75'], prt_vals[-4]))
-            #print("{{txt}}90%    {{res}}{:>9g}      {}       {{txt}}Variance     {{res}}{:>9g}".format(summary['p90'], prt_vals[-3], summary['Var']))
-            #print("{{txt}}95%    {{res}}{:>9g}      {}       {{txt}}Skewness     {{res}}{:>9g}".format(summary['p95'], prt_vals[-2], summary['skewness']))
-            #print("{{txt}}99%    {{res}}{:>9g}      {}       {{txt}}Kurtosis     {{res}}{:>9g}".format(summary['p99'], prt_vals[-1], summary['kurtosis']))
                     
     def _pctiles_from_sorted_v2(self, values, pcs):
         """get percentiles from given sorted iterable of values"""
@@ -1853,7 +1801,6 @@ class Dta():
         typlist = self._typlist
         isstrvar = self._isstrvar
         for i in indexes:
-            #if typlist[i] <= 244:
             if isstrvar(i):
                 raise TypeError("may not label strings")
             lbllist[i] = labname
@@ -1890,7 +1837,6 @@ class Dta():
         """helper function for label_language()"""
         chrdict = self._chrdict
         varlist = self._varlist
-        #vallabs = self._vallabs
         
         # shorten language list
         langs = [lang for lang in langs if lang != languagename]
@@ -2286,18 +2232,9 @@ class Dta():
                 or not isinstance(x, collections.Iterable))
             else (x if hasattr(x, "__len__") else tuple(x)))
             
-        #def tuple_maker(x):
-        #    if (any(isinstance(x, t) for t in (str, bytes, bytearray)) 
-        #            or not isinstance(x, collections.Iterable)):
-        #        return (x,)
-        #    if hasattr(x, "__len__"):
-        #        return x
-        #    return tuple(x)
-            
         if isinstance(value, Dta):
             value = value._varvals
         else: # force input into 2d structure
-            #if isinstance(value, str) or not isinstance(value, collections.Iterable):
             if (any(isinstance(value, t) for t in (str,bytes,bytearray))
                     or not isinstance(value, collections.Iterable)):
                 value = ((value,),)
@@ -2413,7 +2350,6 @@ class Dta():
         
     def copy(self):
         """return a Dta instance that is a copy of the current instance"""
-        #c = self[:,:]
         c = type(self)(self) # using self's constructor on self
         c._srtlist = self._srtlist.copy() # srtlist is not copied in __init__
         return c
@@ -2430,7 +2366,7 @@ class Dta():
         if not self._nvar == other._nvar: return False
         if not self._nobs == other._nobs: return False
         if not self._ds_format == other._ds_format: return False
-        #if not self._data_label == other.data_label: return False # keep this ?
+        #if not self._data_label == other.data_label: return False # keep ?
         
         #descriptors
         if not self._typlist == other._typlist: return False
@@ -2696,7 +2632,6 @@ class Dta():
             self._ds_format = unpack('b', sfile.read(1))[0]
             byteorder = '>' if unpack('b', sfile.read(1))[0] == 1 else '<'
             self._byteorder = byteorder
-            #self._filetype = unpack('b', sfile.read(1))[0]
             sfile.seek(1,1) # filetype
             sfile.seek(1,1) # padding
             self._nvar = nvar = unpack(byteorder + 'h', sfile.read(2))[0]
@@ -2948,7 +2883,7 @@ class Dta():
                     for obs_num in range(nobs):
                         v, o = varvals[obs_num][var_num]
                         # raise error if having 'forward reference'?
-                        #if not (o < j or (o == j and v < i)):
+                        # if not (o < j or (o == j and v < i)):
                         #    raise ...
                         varvals[obs_num][var_num] = strls[(v,o)]
             
@@ -3018,9 +2953,7 @@ class Dta115(Dta):
     """A Python class for Stata dataset version 115. It provides methods 
     for creating, opening, manipulating, and saving Stata datasets.
     
-    """
-    #def __init__(self, *args, **kwargs):
-    #    Dta.__init__(self, *args, **kwargs)    
+    """  
     
     _default_fmt_widths = {251: 8, 252: 8, 253: 12, 254: 9, 255: 10}
     _default_fmts = {251: '%8.0g', 252: '%8.0g', 
@@ -3259,14 +3192,12 @@ class Dta115(Dta):
         # header
         self._ds_format  = 115
         self._byteorder  = ">" if sys.byteorder == "big" else "<"
-        #self._filetype   = 1
         self._nvar       = curr_nvars
         self._nobs       = nrows
         self._data_label = ""
         self._set_timestamp()
            
         # descriptors
-        #formats = {251: '%8.0g', 252: '%8.0g', 253: '%12.0g', 254: '%9.0g', 255: '%10.0g'}
         formats = self._default_fmts
         
         self._typlist = typlist
@@ -3324,7 +3255,6 @@ class Dta115(Dta):
         if st_type is None:
             st_type = 251 if compress else 254
         elif isinstance(st_type, str):
-            #if STRING_TYPES_RE.match(st_type):
             if re.match(r'^str[0-9]+$', st_type):
                 st_type = int(st_type[3:])
                 if st_type > 244:
@@ -3460,11 +3390,8 @@ class Dta115(Dta):
                     st_type_name = "str" + str(st_type)
                 else:
                     st_type_name = type_names[st_type - 251]
-                #st_type_name = "str" + str(st_type) if st_type <= 244 else type_names[st_type - 251]
                 msg = ("{err}warning: some values were incompatible with " + 
                        "specified type;\n    type changed to " + st_type_name)
-                #print("{err}warning: some values were incompatible with specified type;")
-                #print("    type changed to " + st_type_name)
                 print(msg)
             if str_clipped:
                 print("{err}warning: some strings were " + 
@@ -3476,8 +3403,7 @@ class Dta115(Dta):
         self._typlist.append(st_type)
         self._varlist.append(name)
         self._srtlist.append(None)
-        self._fmtlist.append('%' + str(max(9,st_type)) + 's' if st_type <= 244 
-            #else {251: '%8.0g', 252: '%8.0g', 253: '%12.0g', 254: '%9.0g', 255: '%10.0g'}[st_type])
+        self._fmtlist.append('%' + str(max(9,st_type)) + 's' if st_type <= 244
                              else self._default_fmts[st_type])
         self._lbllist.append('')
         self._vlblist.append('')
@@ -3490,9 +3416,6 @@ class Dta115(Dta):
         Be sure to strip spaces before calling this function.
         
         """
-        #nchars = len(name)
-        #if nchars == 0 or nchars > 32: return False
-        #if name in RESERVED or STRING_TYPES_RE.match(name): return False
         if name in RESERVED or re.match(r'^str[0-9]+$', name): return False
         return True if VALID_NAME_RE.match(name) else False
         
@@ -3529,12 +3452,11 @@ class Dta115(Dta):
         elif last_char == 'x': # hexadecimal
             return True if fmt == '%21x' or fmt == '%-12x' else False
         elif last_char in {'f', 'g', 'e', 'c'}: # numeric
-            #return True if NUM_FMT_RE.match(fmt) else False
             m = NUM_FMT_RE.match(fmt)
             if not m: return False
             width = int(m.group(3))
             if width == 0 or width <= int(m.group(5)) or width > 244: 
-                return False # Stata 12 limits; Stata 13 is likely different
+                return False
             return True
             
         return False
@@ -3632,8 +3554,6 @@ class Dta115(Dta):
                     new_name = "str" + str(new_type)
                 else:
                     new_name = type_names[new_type - 251]
-                #old_name = "str" + str(old_type) if old_type <= 244 else type_names[old_type - 251]
-                #new_name = "str" + str(new_type) if new_type <= 244 else type_names[new_type - 251]
                 msg = (
                     "{txt}Stata type for " + 
                     "{} was {}, now {}".format(varlist[c], old_name, new_name))
@@ -3675,30 +3595,6 @@ class Dta115(Dta):
         nvar = self._nvar
         
         missing_save_val = self._missing_save_val
-        
-        #def write_byte_str(str_iter, nchars, use_null=True):
-        #    # leave room for b'\0' if null terminated
-        #    str_len = nchars - 1 if use_null else nchars
-        #    for s in str_iter:
-        #        #s = bytearray(s, 'ascii')[:str_len]
-        #        s = bytearray(s, 'iso-8859-1')[:str_len]
-        #        p = pack(str(nchars) + 's', s)
-        #        dta.write(p)
-            
-        #def write_var_val(value, st_type):
-        #    if st_type <= 244:
-        #        write_byte_str((value,), st_type, False)
-        #    else:
-        #        fmt, nbytes = type_dict[st_type]
-        #        # Get correct dta value if missing. As a safety, check
-        #        # for non-standard missing (None and large values).
-        #        if value is None:
-        #            value = first_missing[st_type]
-        #        elif isinstance(value, MissingValue): # need to add  or value >= first_missing[st_type] and need to check against smallest non-missing for that st_type ?
-        #            value = missing_save_val(value, st_type)
-        #        elif value > 8.988465674311579e+307 or value < -1.7976931348623157e+308: #value >= 8.98846567431158e+307: # need to also check whether value is < LEAST_NONMISSING
-        #            value = missing_save_val(get_missing(value), st_type) # is this the right way to handle this ?
-        #        dta.write(pack(byteorder + fmt, value))
                 
         def write_value_label_table(labname, table):
             # Stata limits are a bit confusing. Total length of text 
@@ -3728,12 +3624,6 @@ class Dta115(Dta):
                     val = val[:i]
                     txt = txt[:i]
                     nval = i
-                    # could do something like the following, keep exactly as much text as possible,
-                    # but that could be confusing when discovered interactively
-                    #    off = off[:i+1]
-                    #    val = val[:i+1] # discard remaining
-                    #    txt = txt[:i] + [txt[i][:32000 - offset]] # cut off ith text to fit ((32000 - offset) < 0)
-                    #    nval = i + 1
                     break
                 off.append(offset)
             txt_len = off[-1] + len(txt[-1]) + 1
@@ -3741,7 +3631,6 @@ class Dta115(Dta):
             table_len = 4 + 4 + 4*nval + 4*nval + txt_len
             
             dta.write(pack(byteorder + "l", table_len))
-            #write_byte_str((labname,), 33)
             dta.write(bytearray(labname, 'iso-8859-1') +
                       b'\0'*(33-len(labname)))
             dta.write(b'\x00\x00\x00')
@@ -3762,19 +3651,16 @@ class Dta115(Dta):
             dta.write(pack('b', 0)) # padding
             dta.write(pack(byteorder + 'h', self._nvar))
             dta.write(pack(byteorder + 'i', self._nobs))
-            #write_byte_str((self._data_label,), 81)
             data_label = self._data_label[:80]
             dta.write(bytearray(data_label, 'iso-8859-1') +
                       b'\0'*(81-len(data_label)))
             self._set_timestamp() # new time_stamp
-            #write_byte_str((self._time_stamp,), 18)
             time_stamp = self._time_stamp[:17]
             dta.write(bytearray(time_stamp, 'iso-8859-1') +
                       b'\0'*(18-len(time_stamp)))
             
             # descriptors
             dta.write(bytes(self._typlist))
-            #write_byte_str(self._varlist, 33)
             for name in self._varlist:
                 name = name[:32]
                 dta.write(bytearray(name, 'iso-8859-1') + b'\0'*(33-len(name)))
@@ -3784,17 +3670,14 @@ class Dta115(Dta):
             srtlist = self._srtlist + [None]
             srtlist = [srt + 1 if srt is not None else 0 for srt in srtlist]
             dta.write(pack(byteorder + 'h'*(nvar + 1), *srtlist))
-            #write_byte_str(self._fmtlist, 49)
             for fmt in self._fmtlist:
                 fmt = fmt[:48]
                 dta.write(bytearray(fmt, 'iso-8859-1') + b'\0'*(49-len(fmt)))
-            #write_byte_str(self._lbllist, 33)
             for lab in self._lbllist:
                 lab = lab[:32]
                 dta.write(bytearray(lab, 'iso-8859-1') + b'\0'*(33-len(lab)))
             
             # variable labels
-            #write_byte_str(self._vlblist, 81)
             for lab in self._vlblist:
                 lab = lab[:80]
                 dta.write(bytearray(lab, 'iso-8859-1') + b'\0'*(81-len(lab)))
@@ -3807,27 +3690,20 @@ class Dta115(Dta):
                 for charname in vardict:
                     charname = charname[:32]
                     char = vardict[charname][:67784]  # or 8681 for Small Stata
-                    #charlength = min(len(charstring), 67784) 
-                    #data_len = 66 + charlength + 1 # +1 for null termination
                     data_len = 66 + len(char) + 1 # +1 for null termination
                     dta.write(b'\x01') # data_type
                     dta.write(pack(byteorder + 'i', data_len))
-                    #write_byte_str((varname,), 33)
                     dta.write(bytearray(varname, 'iso-8859-1') + 
                               b'\0'*(33 - len(varname)))
-                    #write_byte_str((charname,), 33)
                     dta.write(bytearray(charname, 'iso-8859-1') + 
                               b'\0'*(33 - len(charname)))
-                    #write_byte_str((char,), charlength + 1)
                     dta.write(bytearray(char, 'iso-8859-1') + b'\0')
             dta.write(b'\x00\x00\x00\x00\x00')
             
             # data
             for row in self._varvals:
                 for value, st_type in zip(row, typlist):
-                    #write_var_val(value, st_type)
                     if st_type <= 244:
-                        #write_byte_str((value,), st_type, False)
                         dta.write(bytearray(value, 'iso-8859-1') + 
                                   b'\0'*(st_type - len(value)))
                     else:
@@ -3887,7 +3763,6 @@ class Dta117(Dta):
         
         # first, list-alize like tuplize in __setitem__
         def make_list(x):
-            #if isinstance(x, str) or not isinstance(x, collections.Iterable):
             if (any(isinstance(x, t) for t in (str,bytes,bytearray))
                     or not isinstance(x, collections.Iterable)):
                 return [x]
@@ -4060,8 +3935,6 @@ class Dta117(Dta):
         self._set_timestamp()
            
         # descriptors
-        #formats = {65530: '%8.0g', 65529: '%8.0g', 65528: '%12.0g', 
-        #           65527: '%9.0g', 65526: '%10.0g'}
         formats = self._default_fmts
         
         self._typlist = typlist
@@ -4277,8 +4150,6 @@ class Dta117(Dta):
                 msg = ("{err}warning: some values were incompatible " + 
                        "with specified type;\n    type changed to " + 
                        st_type_name)
-                #print("{err}warning: some values were incompatible with specified type;")
-                #print("    type changed to " + st_type_name)
                 print(msg)
             if alt_missing:
                 print("{err}warning: some missing values inserted")
@@ -4288,8 +4159,7 @@ class Dta117(Dta):
         self._varlist.append(name)
         self._srtlist.append(None)
         self._fmtlist.append(
-            '%' + str(max(9,st_type) if st_type <= 2045 else 9) + 's' 
-            #if st_type <= 32768 else {65530: '%8.0g', 65529: '%8.0g', 65528: '%12.0g', 65527: '%9.0g', 65526: '%10.0g'}[st_type])
+            '%' + str(max(9,st_type) if st_type <= 2045 else 9) + 's'
             if st_type <= 32768 else self._default_fmts[st_type])
         self._lbllist.append('')
         self._vlblist.append('')
@@ -4302,9 +4172,6 @@ class Dta117(Dta):
         Be sure to strip spaces before calling this function.
         
         """
-        #nchars = len(name)
-        #if nchars == 0 or nchars > 32: return False
-        #if name in RESERVED or STRING_TYPES_RE.match(name): return False
         if name in RESERVED or re.match(r'^str([0-9]+|L)$', name): return False
         return True if VALID_NAME_RE.match(name) else False
         
@@ -4328,7 +4195,6 @@ class Dta117(Dta):
         # categorize using last character
         last_char = fmt[-1]
         if last_char == 's': # string
-            #return True if STR_FMT_RE.match(fmt) else False
             m = STR_FMT_RE.match(fmt)
             if not m: return False
             width = int(m.group(3))
@@ -4341,12 +4207,11 @@ class Dta117(Dta):
         elif last_char == 'x': # hexadecimal
             return True if fmt == '%21x' or fmt == '%-12x' else False
         elif last_char in {'f', 'g', 'e', 'c'}: # numeric
-            #return True if NUM_FMT_RE.match(fmt) else False
             m = NUM_FMT_RE.match(fmt)
             if not m: return False
             width = int(m.group(3))
             if width == 0 or width <= int(m.group(5)) or width > 2045: 
-                return False # Stata 12 limits; Stata 13 is likely different
+                return False
             return True
             
         return False
@@ -4461,8 +4326,6 @@ class Dta117(Dta):
                         "str" + (str(new_type) if new_type <= 2045 else "L"))
                 else:
                     new_name = type_names[65530 - new_type]
-                #old_name = "str" + (str(old_type) if old_type <= 2045 else "L") if old_type <= 32768 else type_names[65530 - old_type]
-                #new_name = "str" + (str(new_type) if new_type <= 2045 else "L") if new_type <= 32768 else type_names[65530 - new_type]
                 msg = ("{{txt}}Stata type for {} was {}, now {}"
                         ).format(varlist[c], old_name, new_name)
                 print(msg)
@@ -4587,7 +4450,6 @@ class Dta117(Dta):
                 dta.write(bytearray(stamp, 'iso-8859-1'))
             else: # there's something wrong with the time stamp, just skip it
                 dta.write(pack(byteorder + 'B', 0))
-                #dta.write(pack('1s', "")) # optional binary zero
             dta.write(bytearray('</timestamp>', 'iso-8859-1'))
             dta.write(bytearray('</header>', 'iso-8859-1'))
             
