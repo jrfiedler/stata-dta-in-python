@@ -2,7 +2,6 @@ from struct import pack, unpack
 from struct import error as StructError
 from math import log, floor, sqrt
 from datetime import datetime
-#import __main__
 import os
 import ntpath
 import collections
@@ -10,7 +9,8 @@ import re
 import copy
 import sys
 
-from stata_dta.missing import get_missing, MissingValue, MISSING, MISSING_VALS
+from stata_dta.stata_missing import (get_missing, MissingValue,
+                                     MISSING, MISSING_VALS)
 
 try:
     from stata import st_format
@@ -316,66 +316,6 @@ class Dta():
         
         varvals = self._varvals
         return [row[col] for row in varvals]
-        
-    def _check_kwargs(self, defaults, specified):
-        """defaults: 
-            -> dictionary of default values and min match length, like
-               { 'detail': {False, 1}, 'separator': {5, 3} ...
-               which means that, eg, separator default is 5, and keyword  
-               must match at least 'sep'
-            -> should contain all possible options
-        specified: user-given options
-        function returns: tuple of length 2
-            -> tuple[0] is dictionary with option values
-            -> tuple[1] is list of unused options
-            
-        """
-        defaults = {k:v for k,v in defaults.items()}
-        opt_val = {}
-                
-        # if in_ and if_ need special checking
-        if 'in_' in defaults:
-            if 'in_' in specified:
-                if isinstance(specified['in_'], collections.Iterable):
-                    opt_val['in_'] = specified['in_']
-                else:
-                    print("{err}in_ option should be iterable ; using default")
-                    opt_val['in_'] = defaults['in_']
-                del specified['in_']
-            else:
-                opt_val['in_'] = defaults['in_']
-            del defaults['in_']
-        if 'if_' in defaults:
-            if 'if_' in specified:
-                if hasattr(specified['if_'], '__call__'):
-                    opt_val['if_'] = specified['if_']
-                else:
-                    print("{err}if_ option should be callable ; using default")
-                    opt_val['if_'] = defaults['if_']
-                del specified['if_']
-            else:
-                opt_val['if_'] = defaults['if_']
-            del defaults['if_']
-            
-        opt_val.update({dkey: dval for dkey, (dval, dlen) in defaults.items()})
-        
-        # options other than in_ and if_
-        unused = []
-        for skey, sval in specified.items():
-            for dkey, (dval, dlen) in defaults.items():
-                if dkey.startswith(skey) and len(skey) >= dlen:
-                    try:
-                        # use the default type to coerce
-                        opt_val[dkey] = type(dval)(sval) 
-                    except TypeError:
-                        msg = ("{{err}}cannot coerce {} value {} to desired " +
-                               "type {} ; using default")
-                        print(msg.format(dkey, sval, type(dval)))
-                    break
-            else: # no break, ie, no match
-                unused.append(skey)
-                
-        return (opt_val, unused)
         
     def _squish_name(self, name, space):
         """Shorten name to fit in given space.
@@ -971,6 +911,72 @@ class Dta():
                     new_pct = values[floor(n)]
             pctiles.append(new_pct)
         return pctiles
+        
+    def _check_summ_args(self, detail=False, meanonly=False, separator=5, 
+                         quietly=False, weight=None, fweight=None, 
+                         aweight=None, iweight=None, in_=None, if_=None):
+        """helper for summarize()"""
+        # if_ and in_ stuff
+        if in_ is not None:
+            if not isinstance(in_, collections.Iterable):
+                raise TypeError("in_ option should be iterable")
+        else:
+            in_ = range(self._nobs)
+            
+        if if_ is not None:
+            if not hasattr(if_, "__call__"):
+                raise TypeError("if_ option should be callable")
+            obs = tuple(i for i in in_ if if_(i))
+        else:
+            obs = tuple(i for i in in_)
+        
+        # weight stuff
+            # check that all non-None weights are string
+        if any(w is not None and not isinstance(w, str) 
+               for w in [weight, fweight, aweight, iweight]):
+            raise TypeError("weight options must be None or string")
+            
+            # count weights that are not None and not empty string
+        nweights = len([w for w in [weight, fweight, aweight, iweight] 
+                            if w is not None and w.strip() != ""])
+        
+        if nweights > 1:
+            raise ValueError("weight options cannot be combined")
+        elif nweights == 1:
+            wt_type, wt_name = (x for x in (('a', weight), ('f', fweight),
+                                            ('a', aweight), ('i', iweight))
+                                if x[1] is not None).__next__()
+            wt_vars = self._find_vars(wt_name)
+            if len(wt_vars) > 1:
+                raise ValueError("only one weight variable allowed")
+            wt_index = self._varlist.index(wt_name)
+                
+            if self._isstrvar(wt_index):
+                raise TypeError("strings cannot be used as weights")
+                    
+            if wt_type == 'i' and detail:
+                msg = "iweight may not be combined with detail option"
+                raise ValueError(msg)
+                
+            if wt_type == 'f' and not self._isintvar(wt_index):
+                raise TypeError("frequency weights must be integer")        
+                
+            if wt_type == 'a' and weight is not None:
+                print("{txt}(analytic weights assumed)")
+        else:
+            wt_type, wt_index = ('a', None)
+        
+        # misc.
+        if detail and meanonly:
+            raise ValueError("options meanonly and detail cannot be combined")
+        if separator != 5:
+            if not isinstance(separator, int):
+                raise TypeError("separator option should be an integer")
+            if separator < 0:
+                separator = 5
+            
+        return obs, (wt_type, wt_index), detail, meanonly, quietly, separator
+            
             
     def summarize(self, varnames="", **kwargs):
         """summarize given variables, 
@@ -989,7 +995,10 @@ class Dta():
             iweight: str varname; may not be combined with other weights;
                     may not be combined with detail option
         
-        """
+        """        
+        (obs, (wt_type, wt_index), detail,
+         meanonly, quietly, separator) = self._check_summ_args(**kwargs)
+         
         # get variables and their indices
         varnames = self._find_vars(varnames, empty_ok=True)
         nvarnames = len(varnames)
@@ -1000,94 +1009,42 @@ class Dta():
         else:
             indexes = list(map(self._varlist.index, varnames))
         
-        # parse options
-        options = {
-            'detail': (False, 1), 'meanonly': (False, 4),
-            'separator': (5, 3), 'quietly': (False, 3), 
-            'weight': ("", 1), 'fweight': ("", 2),
-            'aweight': ("", 2), 'iweight': ("", 2),
-            'in_': range(self._nobs), 'if_': (lambda i: True)} # defaults
-        
-        options, unused = self._check_kwargs(options, kwargs)
-        if options['separator'] <= 0: options['separator'] = 5
-            
-        if unused != []: print("{err}unused arguments: " + " ".join(unused))
-        
-        # check appropriateness of options
-        if options['meanonly'] and options['detail']:
-            raise ValueError("'meanonly' and 'detail' should not both be True")
-        all_weights = (options['weight'], options['fweight'], 
-                      options['aweight'], options['iweight'])
-        nweights = len(" ".join(all_weights).split())
-        if nweights > 1:
-            raise ValueError("at most one weight option may be specified")
-        
-        # find weight index, if any
-        if nweights == 0:
-            w_index, w_type = None, 'a'
-        else:
-            if options['weight'] != '':
-                weight, w_type = options['weight'], 'a'
-            elif options['aweight'] != '':
-                weight, w_type = options['aweight'], 'a'
-            elif options['fweight'] != '':
-                weight, w_type = options['fweight'], 'f'
-            elif options['iweight'] != '':
-                weight, w_type = options['iweight'], 'i'
-            
-            w_names = self._find_vars(weight, empty_ok=True, single=True)
-            w_index = self._varlist.index(w_names[0])
-                
-        if w_index is not None and self._isstrvar(w_index):
-            raise TypeError("strings cannot be used as weights")
-                
-        if w_type == 'i' and options['detail']:
-            raise ValueError("iweights may not be combined with detail option")
-            
-        if w_type == 'f' and not self._isintvar(w_index):
-            raise TypeError("frequency weights must be integer")        
-            
-        if w_type == 'a' and options['weight'] != '':
-            print("{txt}(analytic weights assumed)")
-            
-        # get obs_nums from in_ and if_
-        in_ = options['in_']
-        if_ = options['if_']
-        obs_nums = [i for i in in_ if if_(i)]
-        # generator won't work in last line if there are 
-        # multiple variables being summarized
-        
-        # if 'quietly', calculate for last var and return
-        if options['quietly']:
-            self._single_summ(indexes[-1], w_index, w_type, obs_nums,
-                             options['meanonly'], options['detail'], 
-                             options['quietly'], True)
+        # if quietly, calculate for last var and return
+        if quietly:
+            self._single_summ(indexes[-1], wt_index, wt_type, obs,
+                              meanonly, detail, quietly, True)
             return
         
         # loop through variables
-        separator = options['separator']
-        if not options['meanonly']:
+        if meanonly:
+            for name, index, i in zip(varnames, indexes, range(nvarnames)):
+                self._single_summ(index, wt_index, wt_type, obs, 
+                                  meanonly, detail, quietly, 
+                                  do_return=(i == nvarnames - 1))
+        elif detail:
             print("")
-            if not options['detail']:
-                if w_index is None or w_type == 'f':
-                    print("{txt}    Variable {c |}       Obs        " + 
-                          "Mean    Std. Dev.       Min        Max")
-                else:
-                    print("{txt}    Variable {c |}     Obs      Weight" + 
-                          "        Mean   Std. Dev.       Min        Max")
-        for name, index, i in zip(varnames, indexes, range(nvarnames)):
-            if (not (options['meanonly'] or options['detail']) and 
-                    i % separator == 0):
-                if w_index is None or w_type == 'f':
-                    print("{txt}{hline 13}{c +}{hline 56}")
-                else:
-                    print("{txt}{hline 13}{c +}{hline 65}")
-            self._single_summ(index, w_index, w_type, obs_nums,  
-                             options['meanonly'],
-                             options['detail'],
-                             options['quietly'], 
-                             do_return=(i==nvarnames-1))
-            if options['detail']: print("")
+            for name, index, i in zip(varnames, indexes, range(nvarnames)):
+                self._single_summ(index, wt_index, wt_type, obs,
+                                  meanonly, detail, quietly,
+                                  do_return=(i == nvarnames - 1))
+                print("")
+        else:
+            if wt_index is None or wt_type == 'f':
+                head_str = "".join(("\n{txt}    Variable {c |}       ",
+                    "Obs        Mean    Std. Dev.       Min        Max"))
+                sep_str = "{txt}{hline 13}{c +}{hline 56}"
+            else:
+                head_str = "".join(("\n{txt}    Variable {c |}     Obs      ",
+                      "Weight        Mean   Std. Dev.       Min        Max"))
+                sep_str = "{txt}{hline 13}{c +}{hline 65}"
+            
+            print(head_str)
+            
+            for name, index, i in zip(varnames, indexes, range(nvarnames)):
+                if i % separator == 0: print(sep_str)
+                self._single_summ(index, wt_index, wt_type, obs,
+                                  meanonly, detail, quietly,
+                                  do_return=(i == nvarnames - 1))
             
     summ = summarize
         
@@ -1114,8 +1071,37 @@ class Dta():
         else: # str, presumably
             width = fmt[1:-1]
             return (("{:>" + width).replace(">-", "<") + "}").format(val)
+            
+    def _check_list_args(self, separator, in_, if_):
+        """helper for list()"""
+        # if_ and in_ stuff
+        if in_ is not None:
+            if not isinstance(in_, collections.Iterable):
+                raise TypeError("in_ option should be iterable")
+        else:
+            in_ = range(self._nobs)
+            
+        if if_ is not None:
+            if not hasattr(if_, "__call__"):
+                raise TypeError("if_ option should be callable")
+            obs = tuple(i for i in in_ if if_(i))
+        else:
+            obs = tuple(i for i in in_)
+        
+        # misc.
+        if separator != 5:
+            if not isinstance(separator, int):
+                raise TypeError("separator option should be an integer")
+            if separator < 0:
+                separator = 5
+            
+        return obs, separator
     
     def list(self, varnames="", **kwargs):
+        """Print table of data values. This method only works
+        when used inside of Stata.
+        
+        """
         varnames = self._find_vars(varnames, empty_ok=True)
         if len(varnames) == 0:
             varnames = self._varlist
@@ -1123,21 +1109,7 @@ class Dta():
         find_index = self._varlist.index
         indexes = [find_index(name) for name in varnames]
         
-        # parse options
-        options = {'separator': (5, 3), 'nolabel': (False, 3),
-            'string': (10, 3), 'noobs': (False, 3),
-            'abbreviate': (8, 2), 'in_': range(self._nobs),
-            'if_': (lambda i: True)} # defaults
-        
-        options, unused = self._check_kwargs(options, kwargs)
-        if options['separator'] <= 0: options['separator'] = 5
-        if options['string'] <= 0: options['string'] = 10
-            
-        if unused != []: print("{err}unused arguments: " + " ".join(unused))
-        
-        separator = options['separator']
-        in_ = options['in_']
-        if_ = options['if_']
+        obs, separator = self._check_list_args(**kwargs)
         
         # need to make the display more sophisticated
         # 1. what to do when each row is wider than screen width?
@@ -1147,10 +1119,8 @@ class Dta():
         
         ncols = len(varnames)
         
-        obs = [i for i in in_ if if_(i)]
-        
         ndigits = (1 if len(obs) == 0 or obs[-1] <= 1 
-                   else floor(log(obs[-1]-1, 10)) + 1)
+                   else floor(log(obs[-1] - 1, 10)) + 1)
         widths = [len(self._list_format(fmtlist[i], varvals[0][i])) 
                   for i in indexes]
         row_fmt = " {{:>{}}}. ".format(ndigits)
