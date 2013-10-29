@@ -14,8 +14,9 @@ from stata_dta.stata_missing import (get_missing, MissingValue,
 
 try:
     from stata import st_format
+    IN_STATA = True
 except ImportError:
-    pass
+    IN_STATA = False
 
 
 VALID_NAME_RE = re.compile(r'^[_a-zA-Z][_a-zA-Z0-9]{0,31}$')
@@ -28,6 +29,7 @@ LARGEST_NONMISSING = 8.988465674311579e+307
 SMALLEST_NONMISSING = -1.7976931348623157e+308
 NUM_FMT_RE = re.compile(r'^%(-)?(0)?([0-9]+)(\.|\,)([0-9]+)(f|g|e)(c)?$')
 STR_FMT_RE = re.compile(r'^%(-|~)?(0)?([0-9]+)s$')
+HEX_RE = re.compile(r'^(-)?0x([0-9]+\.[0-9a-f]+)p(\+|-)([0-9]+)?$')
 date_details = r'|'.join(d for d in 
             ('CC', 'cc', 'YY', 'yy', 'JJJ', 'jjj', 'Month', 'Mon', 'month', 
             'mon', 'NN', 'nn', 'DD', 'dd', 'DAYNAME', 'Dayname', 'Day', 'Da',
@@ -1063,7 +1065,8 @@ class Dta():
         self._srtlist = new_srtlist
         self._changed = True
     
-    def _list_format(self, fmt, val):
+    def _list_format_withstata(self, fmt, val):
+        """helper for list()"""
         if isinstance(val, float) or isinstance(val, int):
             return st_format(fmt, val)
         elif isinstance(val, MissingValue):
@@ -1071,6 +1074,107 @@ class Dta():
         else: # str, presumably
             width = fmt[1:-1]
             return (("{:>" + width).replace(">-", "<") + "}").format(val)
+    
+    def _list_format_nostata(self, fmt_info, val):
+        """helper for list()"""
+        if isinstance(val, MissingValue):
+            val = val.value
+        
+        fmt_type = fmt_info[0]
+        decimal_comma = fmt_type in ('f', 'g', 'e') and fmt_info[3] is not None
+        if fmt_type in ('s', 'f', 'g', 'e'):
+            if fmt_type == 's' or fmt_info[3] is None:  # ie, no comma needed
+                return fmt_info[1].format(val)
+            else:
+                return fmt_info[1].format(val).replace(".", ",")
+        elif fmt_type == 'x':
+            return self._stata_hex_format(val)
+        elif fmt_type in ('H', 'L'):
+            return self._stata_HL_format(fmt_info[1], val)
+        else:
+            raise ValueError("internal error; contact package author")
+    
+    def _convert_hex(self, hex):
+        """convert Python's hex representation to Stata's"""
+        if not isinstance(hex, str):
+            raise TypeError("given hex must be str")
+        m = HEX_RE.match(hex)
+        if m is None:
+            raise ValueError("given string does not seem to be Python hex")
+        sign, base, exp_sign, exp = [m.group(i) for i in range(1,5)]
+        new_sign = "+" if sign is None else sign
+        # Line below converts exp to hex. The "0x" prefix is removed 
+        # with [2:]. The exponent is padded with (too many) zeros (Stata 
+        # requires 3 digits), and reduced to last 3 digits with [-3:].
+        new_exp = ("000" + hex(int(exp))[2:])[-3:]
+        return "".join((new_sign, base, 'X', exp_sign, new_exp))
+        
+    def _stata_hex_format(self, value):
+        """convert numeric value to string in Stata hex format"""
+        return self._convert_hex(float(value).hex())
+        
+    def _stata_HL_format(self, fmt, value):
+        """convert numeric value to string in one of Stata's H or L formats"""
+        if fmt == '%16H':
+            return "".join(hex(x)[2:] for x in pack('>d', value))
+        if fmt == '%8H':
+            return "".join(hex(x)[2:] for x in pack('>f', value))
+        if fmt == '%16L':
+            return "".join(hex(x)[2:] for x in pack('<d', value))
+        if fmt == '%8L':
+            return "".join(hex(x)[2:] for x in pack('<f', value))
+        raise ValueError("{} is not a recognized hilo format".format(fmt))
+    
+    def _translate_fmts(self):
+        """Translate Stata formats to Python. Bad formats
+        are replaced by default format for given type.
+        
+        """
+        fmt_info = []
+        fmt_append = fmt_info.append
+        
+        isvalid = self._is_valid_fmt
+        typlist = self._typlist
+        isstrvar = self._isstrvar
+        default_fmt = self._default_fmt
+        
+        for i, fmt in enumerate(self._fmtlist):
+            fmt = fmt.strip()
+            
+            iscalendar = (fmt[1:3] == "tb" or fmt[1:4] == "-tb" or 
+                          fmt[1] == 't' or fmt[1:3] == '-t')
+            
+            if not isvalid(fmt) or iscalendar:
+                if isstrvar(i):
+                    width = min(typlist[i], 10)
+                    fmt_append("{:>{}s}".format(width))
+                    continue
+                else:
+                    fmt = default_fmt[typlist[i]]
+            
+            last_char = fmt[-1]
+            if last_char == 's': # string
+                m = STR_FMT_RE.match(fmt)
+                align, _, width = m.group(1), m.group(2), m.group(3)
+                new_align = ("<" if align == "-" 
+                                 else "^" if align == "~" else ">")
+                new = "".join(("{:", new_align, width, "s}"))
+                fmt_append(('s', new, int(width)))
+            elif last_char == 'H' or last_char == 'L': # binary
+                fmt_append((last_char, fmt, int(fmt[1:-1])))
+            elif last_char == 'x': # hexadecimal
+                fmt_append(('x', fmt, 21))
+            elif last_char in {'f', 'g', 'e', 'c'}: # numeric
+                m = NUM_FMT_RE.match(fmt)
+                align, _, wid, delim, pre, type, com = (m.group(1), m.group(2), 
+                                                        m.group(3), m.group(4),
+                                                        m.group(5), m.group(6),
+                                                        m.group(7))
+                new_align = "<" if align == "-" else ">"
+                new = "".join(("{:", new_align, width, ".", pre, type, "}"))
+                fmt_append((type, new, int(width), com))
+                
+        return fmt_info
             
     def _check_list_args(self, separator, in_, if_):
         """helper for list()"""
@@ -1109,23 +1213,30 @@ class Dta():
         find_index = self._varlist.index
         indexes = [find_index(name) for name in varnames]
         
+        if IN_STATA:
+            fmts = self._fmtlist
+            widths = [len(self._list_format(fmts[i], varvals[0][i])) 
+                      for i in indexes]
+            list_format = self._list_format_withstata
+        else:
+            fmts = self._translate_fmts()  # formats plus other info
+            widths = [info[2] for info in fmt_info]
+            list_format = self._list_format_nostata
+        
         obs, separator = self._check_list_args(**kwargs)
         
         # need to make the display more sophisticated
         # 1. what to do when each row is wider than screen width?
         # 2. allow other Stata options
         varvals = self._varvals
-        fmtlist = self._fmtlist
         
         ncols = len(varnames)
         
         ndigits = (1 if len(obs) == 0 or obs[-1] <= 1 
                    else floor(log(obs[-1] - 1, 10)) + 1)
-        widths = [len(self._list_format(fmtlist[i], varvals[0][i])) 
-                  for i in indexes]
         row_fmt = " {{:>{}}}. ".format(ndigits)
-        col_fmt = ["{:" + ("<" if fmtlist[i][1] == "-" else ">") + 
-                    "{}}}".format(w) for i, w in zip(indexes, widths)]
+        col_fmt = ["{:" + ("<" if self._fmtlist[i][1] == "-" else ">") + 
+                   "{}}}".format(w) for i, w in zip(indexes, widths)]
         
         spacer = " "*(ndigits + 3)
         
@@ -1143,14 +1254,12 @@ class Dta():
               " {txt}{c |}")
         
         # values
-        sepcount = 0
-        for i in obs:
-            if sepcount % separator == 0:
+        for i, obs_count in enumerate(obs):
+            if obs_count % separator == 0:
                 print(sep_line)
-            sepcount += 1
             row = varvals[i]
             print(row_fmt.format(i) + "{c |} {res}" +
-                  "  ".join(self._list_format(fmtlist[i], row[i]) 
+                  "  ".join(self._list_format(fmts[i], row[i]) 
                             for i in indexes) + 
                   " {txt}{c |}")
         
@@ -2927,7 +3036,7 @@ class Dta115(Dta):
     
     _default_fmt_widths = {251: 8, 252: 8, 253: 12, 254: 9, 255: 10}
     _default_fmts = {251: '%8.0g', 252: '%8.0g', 
-                    253: '%12.0g', 254: '%9.0g', 255: '%10.0g'}
+                     253: '%12.0g', 254: '%9.0g', 255: '%10.0g'}
     
     def _isstrvar(self, index):
         """determine whether Stata variable is string"""
@@ -3397,8 +3506,8 @@ class Dta115(Dta):
         if fmt[0] != '%':
             return False
         
-        # handle business calendars first;
-        # this does not check the calendar name's validity
+        # Handle business calendars first.
+        # This does not check the calendar name.
         if fmt[1:3] == "tb" or fmt[1:4] == "-tb":
             return True if TB_FMT_RE.match(fmt) else False
             
@@ -3409,15 +3518,14 @@ class Dta115(Dta):
         # categorize using last character
         last_char = fmt[-1]
         if last_char == 's': # string
-            #return True if STR_FMT_RE.match(fmt) else False
             m = STR_FMT_RE.match(fmt)
             if not m: return False
             width = int(m.group(3))
             if width == 0 or width > 244: return False
             return True
         elif last_char == 'H' or last_char == 'L': # binary
-            # valid binary formats are ^%(8|16)(H|L)$ ; Stata doesn't raise 
-            # error with -8 or -16, but the results are perhaps not as expected
+            # Valid binary formats are ^%(8|16)(H|L)$. Stata doesn't raise 
+            # error with -8 or -16, but the results are perhaps unexpected.
             return True if fmt[1:-1] in ('8', '16', '-8', '-16') else False
         elif last_char == 'x': # hexadecimal
             return True if fmt == '%21x' or fmt == '%-12x' else False
@@ -3704,7 +3812,7 @@ class Dta117(Dta):
     """
     _default_fmt_widths = {65530: 8, 65529: 8, 65528: 12, 65527: 9, 65526: 10}
     _default_fmts = {65530: '%8.0g', 65529: '%8.0g', 
-                    65528: '%12.0g', 65527: '%9.0g', 65526: '%10.0g'}
+                     65528: '%12.0g', 65527: '%9.0g', 65526: '%10.0g'}
     
     def _isstrvar(self, index):
         """determine if Stata variable is string"""
@@ -4153,8 +4261,8 @@ class Dta117(Dta):
         if fmt[0] != '%':
             return False
         
-        # handle business calendars first;
-        # this does not check the calendar name's validity
+        # Handle business calendars first.
+        # This does not check the calendar name.
         if fmt[1:3] == "tb" or fmt[1:4] == "-tb":
             return True if TB_FMT_RE.match(fmt) else False
             
@@ -4171,8 +4279,8 @@ class Dta117(Dta):
             if width == 0 or width > 2045: return False
             return True
         elif last_char == 'H' or last_char == 'L': # binary
-            # valid binary formats are ^%(8|16)(H|L)$ ; Stata doesn't raise 
-            # error with -8 or -16, but the results are perhaps not as expected
+            # Valid binary formats are ^%(8|16)(H|L)$. Stata doesn't raise 
+            # error with -8 or -16, but the results are perhaps unexpected.
             return True if fmt[1:-1] in ('8', '16', '-8', '-16') else False
         elif last_char == 'x': # hexadecimal
             return True if fmt == '%21x' or fmt == '%-12x' else False
