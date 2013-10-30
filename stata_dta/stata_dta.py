@@ -1271,46 +1271,6 @@ class Dta():
             print(row_tplt.format(rownum_tplt.format(i), row_info))
         
         print(bot_line)
-        
-        ## need to make the display more sophisticated
-        ## 1. what to do when each row is wider than screen width?
-        ## 2. allow other Stata options
-        #varvals = self._varvals
-        #
-        #ncols = len(varnames)
-        #
-        #ndigits = (1 if len(obs) == 0 or obs[-1] <= 1 
-        #           else floor(log(obs[-1] - 1, 10)) + 1)
-        #row_fmt = " {{:>{}}}. ".format(ndigits)
-        #col_fmt = ["{:" + ("<" if self._fmtlist[i][1] == "-" else ">") + 
-        #           "{}}}".format(w) for i, w in zip(indexes, widths)]
-        #
-        #spacer = " "*(ndigits + 3)
-        #
-        #inner_width = 2*ncols + sum(widths)
-        #hline = "{hline " + str(inner_width) + "}"
-        #sep_line = spacer + "{c LT}" + hline + "{c RT}"
-        #
-        ## variable names
-        #print("{txt}")
-        #squish = self._squish_name
-        #print(spacer + "{c TLC}" + hline + "{c TRC}")
-        #print(spacer + "{c |} {res}" + 
-        #      "  ".join([f.format(squish(n, w)) 
-        #                 for f, n, w in zip(col_fmt, varnames, widths)]) +
-        #      " {txt}{c |}")
-        #
-        ## values
-        #for i, obs_count in enumerate(obs):
-        #    if obs_count % separator == 0:
-        #        print(sep_line)
-        #    row = varvals[i]
-        #    print(row_fmt.format(i) + "{c |} {res}" +
-        #          "  ".join(self._list_format(fmts[i], row[i]) 
-        #                    for i in indexes) + 
-        #          " {txt}{c |}")
-        #
-        #print(spacer + "{c BLC}" + hline + "{c BRC}")
     
     def order(self, varnames, last=False, 
               before=None, after=None, alpha=False):
