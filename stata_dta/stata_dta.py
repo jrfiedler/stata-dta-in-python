@@ -913,12 +913,9 @@ class Dta():
                     new_pct = values[floor(n)]
             pctiles.append(new_pct)
         return pctiles
-        
-    def _check_summ_args(self, detail=False, meanonly=False, separator=5, 
-                         quietly=False, weight=None, fweight=None, 
-                         aweight=None, iweight=None, in_=None, if_=None):
-        """helper for summarize()"""
-        # if_ and in_ stuff
+    
+    def _obs_from_in_if(self, in_=None, if_=None):
+        """helper for any method that takes in_ and if_ observation args"""
         if in_ is not None:
             if not isinstance(in_, collections.Iterable):
                 raise TypeError("in_ option should be iterable")
@@ -931,6 +928,14 @@ class Dta():
             obs = tuple(i for i in in_ if if_(i))
         else:
             obs = tuple(i for i in in_)
+        
+        return obs
+        
+    def _check_summ_args(self, detail=False, meanonly=False, separator=5, 
+                         quietly=False, weight=None, fweight=None, 
+                         aweight=None, iweight=None, in_=None, if_=None):
+        """helper for summarize()"""
+        obs = self._obs_from_in_if(in_, if_)
         
         # weight stuff
             # check that all non-None weights are string
@@ -964,7 +969,8 @@ class Dta():
                 raise TypeError("frequency weights must be integer")        
                 
             if wt_type == 'a' and weight is not None:
-                print("{txt}(analytic weights assumed)")
+                if IN_STATA: print("{txt}(analytic weights assumed)")
+                else: print("(analytic weights assumed)")
         else:
             wt_type, wt_index = ('a', None)
         
@@ -979,27 +985,26 @@ class Dta():
             
         return obs, (wt_type, wt_index), detail, meanonly, quietly, separator
             
-            
-    def summarize(self, varnames="", **kwargs):
+    def summarize(self, varnames="", *args, **kwargs):
         """summarize given variables, 
             or all variables if no varnames spacified.
         available options:
-            quietly: bool
-            separator: int
-            meanonly: bool, may not be combined with detail
             detail: bool, may not be combined with meanonly
-            in_: iterable of int
-            if_: function taking single int and returning bool
+            meanonly: bool, may not be combined with detail
+            separator: int
+            quietly: bool
             weight: str varname; may not be combined with other weights
             aweight: str varname; may not be combined with other weights
             fweight: str varname; may not be combined with other weights;
                     given Stata variable must be int
             iweight: str varname; may not be combined with other weights;
                     may not be combined with detail option
+            in_: iterable of int
+            if_: function taking single int and returning bool
         
         """        
         (obs, (wt_type, wt_index), detail,
-         meanonly, quietly, separator) = self._check_summ_args(**kwargs)
+         meanonly, quietly, separator) = self._check_summ_args(*args, **kwargs)
          
         # get variables and their indices
         varnames = self._find_vars(varnames, empty_ok=True)
@@ -1065,6 +1070,94 @@ class Dta():
         self._srtlist = new_srtlist
         self._changed = True
     
+    def _convert_hex(self, hex_value):
+        """convert Python's hex representation to Stata's"""
+        if not isinstance(hex_value, str):
+            raise TypeError("given hex value must be str")
+        m = HEX_RE.match(hex_value)
+        if m is None:
+            raise ValueError("given string does not seem to be Python hex")
+        sign_char, base, exp_sign, exp = [m.group(i) for i in range(1,5)]
+        new_sign = "+" if sign_char is None else sign_char
+        # Line below converts exp to hex value. The "0x" prefix is removed 
+        # with [2:]. The exponent is padded with (too many) zeros (Stata 
+        # requires 3 digits), and reduced to last 3 digits with [-3:].
+        new_exp = ("000" + hex(int(exp))[2:])[-3:]
+        return "".join((new_sign, base, 'X', exp_sign, new_exp))
+        
+    def _stata_hex_format(self, value):
+        """convert numeric value to string in Stata hex format"""
+        return self._convert_hex(float(value).hex())
+        
+    def _stata_HL_format(self, fmt, value):
+        """convert numeric value to string in one of Stata's H or L formats"""
+        if fmt == '%16H':
+            packed_value = pack('>d', value)
+        elif fmt == '%8H':
+            packed_value = pack('>f', value)
+        elif fmt == '%16L':
+            packed_value = pack('<d', value)
+        elif fmt == '%8L':
+            packed_value = pack('<f', value)
+        else:
+            raise ValueError("{} is not a recognized hilo format".format(fmt))
+        
+        return "".join(hex(x)[2:].zfill(2) for x in packed_value)
+    
+    def _translate_fmts(self):
+        """Translate Stata formats to Python. Bad formats
+        are replaced by default format for given type.
+        
+        """
+        fmt_info = []
+        fmt_append = fmt_info.append
+        
+        isvalid = self._is_valid_fmt
+        typlist = self._typlist
+        isstrvar = self._isstrvar
+        default_fmts = self._default_fmts
+        
+        for i, fmt in enumerate(self._fmtlist):
+            fmt = fmt.strip()
+            
+            iscalendar = (fmt[1] == 't' or fmt[1:3] == '-t')
+            
+            if iscalendar or not isvalid(fmt):
+                if isstrvar(i):
+                    wid = min(typlist[i], 10)
+                    fmt_append(('s', "{{:>{}s}}".format(wid), wid))
+                    continue
+                else:
+                    fmt = default_fmts[typlist[i]]
+            
+            last_char = fmt[-1]
+            if last_char == 's': # string
+                m = STR_FMT_RE.match(fmt)
+                align, _, wid = m.group(1), m.group(2), m.group(3)
+                new_align = ("<" if align == "-" 
+                                 else "^" if align == "~" else ">")
+                new = "".join(("{:", new_align, wid, "s}"))
+                fmt_append(('s', new, int(wid)))
+            elif last_char == 'H' or last_char == 'L': # binary
+                fmt_append((last_char, fmt, int(fmt[1:-1])))
+            elif last_char == 'x': # hexadecimal
+                fmt_append(('x', fmt, 21))
+            elif last_char in {'f', 'g', 'e', 'c'}: # numeric
+                m = NUM_FMT_RE.match(fmt)
+                align, _, wid, delim, prec, type, com = (m.group(1), m.group(2), 
+                                                         m.group(3), m.group(4),
+                                                         m.group(5), m.group(6),
+                                                         m.group(7))
+                aln = "<" if align == "-" else ">"
+                sep = "," if com is not None else ""
+                if type == "g" and int(prec) == 0:
+                    new = "".join(("{:", aln, wid, sep, type, "}"))
+                else:
+                    new = "".join(("{:", aln, wid, sep, ".", prec, type, "}"))
+                fmt_append((type, new, int(wid), delim, com))
+                
+        return fmt_info
+    
     def _list_format_withstata(self, fmt, val):
         """helper for list()"""
         if isinstance(val, float) or isinstance(val, int):
@@ -1078,121 +1171,37 @@ class Dta():
     def _list_format_nostata(self, fmt_info, val):
         """helper for list()"""
         if isinstance(val, MissingValue):
-            val = val.value
+            aln = fmt_info[1][2]
+            wid = str(fmt_info[2])
+            return "".join(("{:", aln, wid, "s}")).format(val)
         
         fmt_type = fmt_info[0]
         decimal_comma = fmt_type in ('f', 'g', 'e') and fmt_info[3] is not None
-        if fmt_type in ('s', 'f', 'g', 'e'):
-            if fmt_type == 's' or fmt_info[3] is None:  # ie, no comma needed
-                return fmt_info[1].format(val)
+        if fmt_type == 's':  # ie, no comma needed
+            # use fmt_info[2], the intended width, to chop off, just in case
+            return fmt_info[1].format(val)[:fmt_info[2]]
+        if fmt_type in ('f', 'g', 'e'):
+            val_str = fmt_info[1].format(val)
+            if fmt_info[3] == ",":  # decimal comma
+                if fmt_info[4] is None:  # no thousands separator
+                    return val_str.replace(".", ",")
+                else:
+                    return ".".join(v.replace(".", ",") 
+                                    for v in val_str.split(","))
             else:
-                return fmt_info[1].format(val).replace(".", ",")
+                return val_str
         elif fmt_type == 'x':
             return self._stata_hex_format(val)
         elif fmt_type in ('H', 'L'):
             return self._stata_HL_format(fmt_info[1], val)
         else:
             raise ValueError("internal error; contact package author")
-    
-    def _convert_hex(self, hex):
-        """convert Python's hex representation to Stata's"""
-        if not isinstance(hex, str):
-            raise TypeError("given hex must be str")
-        m = HEX_RE.match(hex)
-        if m is None:
-            raise ValueError("given string does not seem to be Python hex")
-        sign, base, exp_sign, exp = [m.group(i) for i in range(1,5)]
-        new_sign = "+" if sign is None else sign
-        # Line below converts exp to hex. The "0x" prefix is removed 
-        # with [2:]. The exponent is padded with (too many) zeros (Stata 
-        # requires 3 digits), and reduced to last 3 digits with [-3:].
-        new_exp = ("000" + hex(int(exp))[2:])[-3:]
-        return "".join((new_sign, base, 'X', exp_sign, new_exp))
-        
-    def _stata_hex_format(self, value):
-        """convert numeric value to string in Stata hex format"""
-        return self._convert_hex(float(value).hex())
-        
-    def _stata_HL_format(self, fmt, value):
-        """convert numeric value to string in one of Stata's H or L formats"""
-        if fmt == '%16H':
-            return "".join(hex(x)[2:] for x in pack('>d', value))
-        if fmt == '%8H':
-            return "".join(hex(x)[2:] for x in pack('>f', value))
-        if fmt == '%16L':
-            return "".join(hex(x)[2:] for x in pack('<d', value))
-        if fmt == '%8L':
-            return "".join(hex(x)[2:] for x in pack('<f', value))
-        raise ValueError("{} is not a recognized hilo format".format(fmt))
-    
-    def _translate_fmts(self):
-        """Translate Stata formats to Python. Bad formats
-        are replaced by default format for given type.
-        
-        """
-        fmt_info = []
-        fmt_append = fmt_info.append
-        
-        isvalid = self._is_valid_fmt
-        typlist = self._typlist
-        isstrvar = self._isstrvar
-        default_fmt = self._default_fmt
-        
-        for i, fmt in enumerate(self._fmtlist):
-            fmt = fmt.strip()
             
-            iscalendar = (fmt[1:3] == "tb" or fmt[1:4] == "-tb" or 
-                          fmt[1] == 't' or fmt[1:3] == '-t')
-            
-            if not isvalid(fmt) or iscalendar:
-                if isstrvar(i):
-                    width = min(typlist[i], 10)
-                    fmt_append("{:>{}s}".format(width))
-                    continue
-                else:
-                    fmt = default_fmt[typlist[i]]
-            
-            last_char = fmt[-1]
-            if last_char == 's': # string
-                m = STR_FMT_RE.match(fmt)
-                align, _, width = m.group(1), m.group(2), m.group(3)
-                new_align = ("<" if align == "-" 
-                                 else "^" if align == "~" else ">")
-                new = "".join(("{:", new_align, width, "s}"))
-                fmt_append(('s', new, int(width)))
-            elif last_char == 'H' or last_char == 'L': # binary
-                fmt_append((last_char, fmt, int(fmt[1:-1])))
-            elif last_char == 'x': # hexadecimal
-                fmt_append(('x', fmt, 21))
-            elif last_char in {'f', 'g', 'e', 'c'}: # numeric
-                m = NUM_FMT_RE.match(fmt)
-                align, _, wid, delim, pre, type, com = (m.group(1), m.group(2), 
-                                                        m.group(3), m.group(4),
-                                                        m.group(5), m.group(6),
-                                                        m.group(7))
-                new_align = "<" if align == "-" else ">"
-                new = "".join(("{:", new_align, width, ".", pre, type, "}"))
-                fmt_append((type, new, int(width), com))
-                
-        return fmt_info
-            
-    def _check_list_args(self, separator, in_, if_):
+    def _check_list_args(self, separator=5, in_=None, if_=None):
         """helper for list()"""
-        # if_ and in_ stuff
-        if in_ is not None:
-            if not isinstance(in_, collections.Iterable):
-                raise TypeError("in_ option should be iterable")
-        else:
-            in_ = range(self._nobs)
-            
-        if if_ is not None:
-            if not hasattr(if_, "__call__"):
-                raise TypeError("if_ option should be callable")
-            obs = tuple(i for i in in_ if if_(i))
-        else:
-            obs = tuple(i for i in in_)
         
-        # misc.
+        obs = self._obs_from_in_if(in_, if_)
+        
         if separator != 5:
             if not isinstance(separator, int):
                 raise TypeError("separator option should be an integer")
@@ -1202,68 +1211,106 @@ class Dta():
         return obs, separator
     
     def list(self, varnames="", **kwargs):
-        """Print table of data values. This method only works
-        when used inside of Stata.
-        
-        """
+        """print table of data values"""
         varnames = self._find_vars(varnames, empty_ok=True)
         if len(varnames) == 0:
             varnames = self._varlist
+        ncols = len(varnames)
+        varvals = self._varvals
         
         find_index = self._varlist.index
         indexes = [find_index(name) for name in varnames]
         
         if IN_STATA:
-            fmts = self._fmtlist
-            widths = [len(self._list_format(fmts[i], varvals[0][i])) 
-                      for i in indexes]
             list_format = self._list_format_withstata
+            fmts = self._fmtlist
+            widths = [len(list_format(fmts[i], varvals[0][i])) 
+                      for i in indexes]
         else:
-            fmts = self._translate_fmts()  # formats plus other info
-            widths = [info[2] for info in fmt_info]
             list_format = self._list_format_nostata
+            fmts = self._translate_fmts()  # formats plus other info
+            widths = [info[2] for info in fmts]
         
         obs, separator = self._check_list_args(**kwargs)
         
-        # need to make the display more sophisticated
-        # 1. what to do when each row is wider than screen width?
-        # 2. allow other Stata options
-        varvals = self._varvals
-        
-        ncols = len(varnames)
         
         ndigits = (1 if len(obs) == 0 or obs[-1] <= 1 
                    else floor(log(obs[-1] - 1, 10)) + 1)
-        row_fmt = " {{:>{}}}. ".format(ndigits)
-        col_fmt = ["{:" + ("<" if self._fmtlist[i][1] == "-" else ">") + 
-                   "{}}}".format(w) for i, w in zip(indexes, widths)]
-        
+        rownum_tplt = " {{:>{}}}. ".format(ndigits)
+        colnum_tplt = ["{:" + ("<" if self._fmtlist[i][1] == "-" else ">") + 
+                       "{}}}".format(w) for i, w in zip(indexes, widths)]
         spacer = " "*(ndigits + 3)
         
+        # table boundaries
         inner_width = 2*ncols + sum(widths)
-        hline = "{hline " + str(inner_width) + "}"
-        sep_line = spacer + "{c LT}" + hline + "{c RT}"
+        if IN_STATA:
+            hline = "{hline " + str(inner_width) + "}"
+            top_line = spacer + "{c TLC}" + hline + "{c TRC}"
+            mid_line = spacer + "{c LT}" + hline + "{c RT}"
+            bot_line = spacer + "{c BLC}" + hline + "{c BRC}"
+            row_tplt = "{}{{c |}} {{res}}{} {{txt}}{{c |}}"
+        else:
+            hline = "-" * inner_width
+            top_line = mid_line = bot_line = spacer + "+" + hline + "+"
+            row_tplt = "{}| {} |"
         
         # variable names
-        print("{txt}")
+        if IN_STATA: print("{txt}")
+        print(top_line)
         squish = self._squish_name
-        print(spacer + "{c TLC}" + hline + "{c TRC}")
-        print(spacer + "{c |} {res}" + 
-              "  ".join([f.format(squish(n, w)) 
-                         for f, n, w in zip(col_fmt, varnames, widths)]) +
-              " {txt}{c |}")
+        row_info = "  ".join(tplt.format(squish(n, w)) 
+            for tplt, n, w in zip(colnum_tplt, varnames, widths))
+        print(row_tplt.format(spacer, row_info))
         
         # values
         for i, obs_count in enumerate(obs):
             if obs_count % separator == 0:
-                print(sep_line)
+                print(mid_line)
             row = varvals[i]
-            print(row_fmt.format(i) + "{c |} {res}" +
-                  "  ".join(self._list_format(fmts[i], row[i]) 
-                            for i in indexes) + 
-                  " {txt}{c |}")
+            row_info = "  ".join(list_format(fmts[j], row[j]) for j in indexes)
+            print(row_tplt.format(rownum_tplt.format(i), row_info))
         
-        print(spacer + "{c BLC}" + hline + "{c BRC}")
+        print(bot_line)
+        
+        ## need to make the display more sophisticated
+        ## 1. what to do when each row is wider than screen width?
+        ## 2. allow other Stata options
+        #varvals = self._varvals
+        #
+        #ncols = len(varnames)
+        #
+        #ndigits = (1 if len(obs) == 0 or obs[-1] <= 1 
+        #           else floor(log(obs[-1] - 1, 10)) + 1)
+        #row_fmt = " {{:>{}}}. ".format(ndigits)
+        #col_fmt = ["{:" + ("<" if self._fmtlist[i][1] == "-" else ">") + 
+        #           "{}}}".format(w) for i, w in zip(indexes, widths)]
+        #
+        #spacer = " "*(ndigits + 3)
+        #
+        #inner_width = 2*ncols + sum(widths)
+        #hline = "{hline " + str(inner_width) + "}"
+        #sep_line = spacer + "{c LT}" + hline + "{c RT}"
+        #
+        ## variable names
+        #print("{txt}")
+        #squish = self._squish_name
+        #print(spacer + "{c TLC}" + hline + "{c TRC}")
+        #print(spacer + "{c |} {res}" + 
+        #      "  ".join([f.format(squish(n, w)) 
+        #                 for f, n, w in zip(col_fmt, varnames, widths)]) +
+        #      " {txt}{c |}")
+        #
+        ## values
+        #for i, obs_count in enumerate(obs):
+        #    if obs_count % separator == 0:
+        #        print(sep_line)
+        #    row = varvals[i]
+        #    print(row_fmt.format(i) + "{c |} {res}" +
+        #          "  ".join(self._list_format(fmts[i], row[i]) 
+        #                    for i in indexes) + 
+        #          " {txt}{c |}")
+        #
+        #print(spacer + "{c BLC}" + hline + "{c BRC}")
     
     def order(self, varnames, last=False, 
               before=None, after=None, alpha=False):
