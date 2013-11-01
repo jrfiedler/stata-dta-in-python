@@ -909,7 +909,7 @@ class Dta():
                 sepline = "".join(("-" * 13, "+", "-" * 56))
                 row = "".join(("{:>12} | {N:>9g} {mean:>11g} ", 
                                "{sd:>11g} {min:>10g} {max:>10g}"))
-                zero_row = "{:>12} |         0}"
+                zero_row = "{:>12} |         0"
                 
                 tplt = (header, sepline, row, zero_row)
             else:
