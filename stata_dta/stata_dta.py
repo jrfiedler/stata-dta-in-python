@@ -288,14 +288,17 @@ class Dta():
                 
     def return_list(self):
         """analog of -return list-"""
-        print("")
         if (not hasattr(self, '_return_values') or not self._return_values or 
                 not isinstance(self._return_values, dict)):
             return
         rv = self._return_values
         keys = rv.keys if 'key_order' not in rv else rv['key_order']
+        tplt = "{{txt}}{:>22} = {{res}}{}" if IN_STATA else "{:>22} = {}"
+        
+        print("")
         for key in keys:
-            print("{{txt}}{:>22} = {{res}}{}".format(key, rv[key]))
+            print(tplt.format(key, rv[key]))
+        if not IN_STATA: print("")
     
     def index(self, varname):
         """get index in varlist of given dataset variable"""
@@ -490,7 +493,7 @@ class Dta():
         
     keep_vars = keep_var
         
-    def _single_stats_meanonly(self, v_index, w_index, w_type, obs_nums):
+    def _summ_stats_meanonly(self, v_index, w_index, w_type, obs_nums):
         n = 0
         mean = 0
         min_val = float('inf')
@@ -547,7 +550,7 @@ class Dta():
         stats['key_order'] = ('N', 'sum_w', 'sum', 'mean', 'min', 'max')
         return stats
         
-    def _single_stats_detail(self, v_index, w_index, w_type, obs_nums):
+    def _summ_stats_detail(self, v_index, w_index, w_type, obs_nums):
         n = 0
         mean = 0
         M2 = 0
@@ -695,7 +698,7 @@ class Dta():
                               'p10', 'p25', 'p50', 'p75', 'p90', 'p95', 'p99')
         return stats, prt_vals
         
-    def _single_stats_default(self, v_index, w_index, w_type, obs_nums):
+    def _summ_stats_default(self, v_index, w_index, w_type, obs_nums):
         n = 0
         mean = 0
         M2 = 0
@@ -779,101 +782,6 @@ class Dta():
         stats['key_order'] = ('N', 'sum_w', 'mean', 'Var', 
                               'sd', 'min', 'max', 'sum')
         return stats
-        
-    def _single_summ(self, index, w_index, w_type, obs_nums,
-            meanonly=False, detail=False, quietly=False, do_return=False):
-        # Find # of obs to summ. If zero, no need to do more work, 
-        # just print, set return_values and return.
-        if not self._isnumvar(index):
-            nobs = 0
-        else:
-            if meanonly:
-                summary = self._single_stats_meanonly(index, w_index, 
-                                                      w_type, obs_nums)
-            elif detail:
-                summary, prt_vals = self._single_stats_detail(index, w_index, 
-                                                              w_type, obs_nums)
-            else:
-                summary = self._single_stats_default(index, w_index, 
-                                                     w_type, obs_nums)
-            nobs = summary['N']
-            
-        if nobs == 0:
-            if do_return:
-                self._return_values = {'N': 0, 'sum_w': 0, 'sum': 0, 
-                                            'key_order': ('N', 'sum_w', 'sum')}
-            if meanonly or quietly:
-                return
-            if not detail:
-                if w_index is None or w_type == 'f':
-                    msg = "{{txt}}{:>12} {{c |}} {{res}}{:>9g}"
-                    print(msg.format(self._varlist[index], 0))
-                else:
-                    msg = "{{txt}}{:>12} {{c |}} {{res}}{:>7g} {:>11g}"
-                    print(msg.format(self._varlist[index], 0, 0))
-            else:
-                label = self._vlblist[index]
-                print("{txt}" + " "*(30 - floor(len(label)/2)) + label)
-                print("{hline 61}")
-                print("no observations")
-            return
-        
-        if do_return:
-            self._return_values = summary
-            
-        # if meanonly or quietly=True, nothing left to do
-        if meanonly or quietly:
-            return
-        
-        # display summary
-        if not detail:
-            varname = self._squish_name(self._varlist[index], 12)
-            print("{{txt}}{:>12} {{c |}} ".format(varname), end="")
-            if w_index is None or w_type == 'f':
-                msg = ("{{res}}{N:>9g} {mean:>11g} " + 
-                       "{sd:>11g} {min:>10g} {max:>10g}")
-                print(msg.format(**summary))
-            else:
-                msg = ("{{res}}{N:>7g} {sum_w:>11g} {mean:>11g} " + 
-                       "{sd:>10g} {min:>10g} {max:>10g}")
-                print(msg.format(**summary))
-        else:
-            label = (self._vlblist[index] if self._vlblist[index] != "" 
-                     else self._varlist[index])
-            msg = (
-                "{{txt}}" + " "*(30 - floor(len(label)/2)) + label + "\n" +
-                "{{hline 61}}\n" +
-                "{{txt}}      Percentiles      Smallest\n" +
-                "{{txt}} 1%    {{res}}{:>9g}      {}\n" +
-                "{{txt}} 5%    {{res}}{:>9g}      {}\n" + 
-                "{{txt}}10%    {{res}}{:>9g}      {}" + 
-                    "       {{txt}}Obs          {{res}}{:>9d}\n" + 
-                "{{txt}}25%    {{res}}{:>9g}      {}" + 
-                    "       {{txt}}Sum of Wgt.  {{res}}{:>9g}\n" + 
-                "\n"
-                "{{txt}}50%    {{res}}{:>9g}        " + 
-                    "              {{txt}}Mean         {{res}}{:>9g}\n"
-                "{{txt}}                        " + 
-                    "Largest       Std. Dev.    {{res}}{:>9g}\n" +
-                "{{txt}}75%    {{res}}{:>9g}      {}\n"
-                "{{txt}}90%    {{res}}{:>9g}      {}" +
-                    "       {{txt}}Variance     {{res}}{:>9g}\n"
-                "{{txt}}95%    {{res}}{:>9g}      {}" + 
-                    "       {{txt}}Skewness     {{res}}{:>9g}\n"
-                "{{txt}}99%    {{res}}{:>9g}      {}" + 
-                    "       {{txt}}Kurtosis     {{res}}{:>9g}")
-            print(msg.format(
-                    summary['p1'], prt_vals[0], 
-                    summary['p5'], prt_vals[1], 
-                    summary['p10'], prt_vals[2], summary['N'], 
-                    summary['p25'], prt_vals[3], summary['sum_w'], 
-                    summary['p50'], summary['mean'], 
-                    summary['sd'], 
-                    summary['p75'], prt_vals[-4], 
-                    summary['p90'], prt_vals[-3], summary['Var'], 
-                    summary['p95'], prt_vals[-2], summary['skewness'], 
-                    summary['p99'], prt_vals[-1], summary['kurtosis'])
-                )
                     
     def _pctiles_from_sorted_v2(self, values, pcs):
         """get percentiles from given sorted iterable of values"""
@@ -930,6 +838,173 @@ class Dta():
             obs = tuple(i for i in in_)
         
         return obs
+    
+    def _summ_template(self, w_index=None, w_type=None, detail=False):
+        """helper for summarize()"""
+        if IN_STATA:
+            if detail:
+                header = "{{txt}}{}\n{{hline 61}}"
+                var_tplt = "".join(
+                   ("{{txt}}      Percentiles      Smallest\n",
+                    "{{txt}} 1%    {{res}}{:>9g}      {}\n",
+                    "{{txt}} 5%    {{res}}{:>9g}      {}\n", 
+                    "{{txt}}10%    {{res}}{:>9g}      {}",
+                        "       {{txt}}Obs          {{res}}{:>9d}\n",
+                    "{{txt}}25%    {{res}}{:>9g}      {}",
+                        "       {{txt}}Sum of Wgt.  {{res}}{:>9g}\n",
+                    "\n",
+                    "{{txt}}50%    {{res}}{:>9g}        ",
+                        "              {{txt}}Mean         {{res}}{:>9g}\n",
+                    "{{txt}}                        ",
+                        "Largest       Std. Dev.    {{res}}{:>9g}\n",
+                    "{{txt}}75%    {{res}}{:>9g}      {}\n",
+                    "{{txt}}90%    {{res}}{:>9g}      {}",
+                        "       {{txt}}Variance     {{res}}{:>9g}\n",
+                    "{{txt}}95%    {{res}}{:>9g}      {}",
+                        "       {{txt}}Skewness     {{res}}{:>9g}\n",
+                    "{{txt}}99%    {{res}}{:>9g}      {}",
+                        "       {{txt}}Kurtosis     {{res}}{:>9g}"))
+                    
+                tplt = (header, var_tplt)
+            elif w_index is None or w_type == 'f':
+                header = "".join(("\n{txt}    Variable {c |}       ",
+                    "Obs        Mean    Std. Dev.       Min        Max"))
+                sepline = "{txt}{hline 13}{c +}{hline 56}"
+                row = "".join(("{{txt}}{:>12} {{c |}} {{res}}{N:>9g} ", 
+                               "{mean:>11g} {sd:>11g} {min:>10g} {max:>10g}"))
+                zero_row = "{{txt}}{:>12} {{c |}} {{res}}        0"
+                
+                tplt = (header, sepline, row, zero_row)
+            else:
+                header = "".join(("\n{txt}    Variable {c |}     Obs      ",
+                      "Weight        Mean   Std. Dev.       Min        Max"))
+                sepline = "{txt}{hline 13}{c +}{hline 65}"
+                row = "".join(("{{txt}}{:>12} {{c |}} {{res}}",
+                               "{N:>7g} {sum_w:>11g} {mean:>11g} ", 
+                               "{sd:>10g} {min:>10g} {max:>10g}"))
+                zero_row = "{{txt}}{:>12} {{c |}} {{res}}      0           0"
+                
+                tplt = (header, sepline, row, zero_row)
+        else:
+            if detail:
+                header = "".join(("{}\n", "-" * 61))
+                var_tplt = "".join(
+                   ("      Percentiles      Smallest\n",
+                    " 1%    {:>9g}      {}\n",
+                    " 5%    {:>9g}      {}\n", 
+                    "10%    {:>9g}      {}       Obs          {:>9d}\n",
+                    "25%    {:>9g}      {}       Sum of Wgt.  {:>9g}\n",
+                    "\n",
+                    "50%    {:>9g}", " " * 22, "Mean         {:>9g}\n",
+                    " " * 24, "Largest       Std. Dev.    {:>9g}\n",
+                    "75%    {:>9g}      {}\n",
+                    "90%    {:>9g}      {}       Variance     {:>9g}\n",
+                    "95%    {:>9g}      {}       Skewness     {:>9g}\n",
+                    "99%    {:>9g}      {}       Kurtosis     {:>9g}"))
+                    
+                tplt = (header, var_tplt)
+            elif w_index is None or w_type == 'f':
+                header = "".join(("\n    Variable |       ",
+                    "Obs        Mean    Std. Dev.       Min        Max"))
+                sepline = "".join(("-" * 13, "+", "-" * 56))
+                row = "".join(("{:>12} | {N:>9g} {mean:>11g} ", 
+                               "{sd:>11g} {min:>10g} {max:>10g}"))
+                zero_row = "{:>12} |         0}"
+                
+                tplt = (header, sepline, row, zero_row)
+            else:
+                header = "".join(("\n    Variable |     Obs      ",
+                      "Weight        Mean   Std. Dev.       Min        Max"))
+                sepline = "".join(("-" * 13, "+", "-" * 65))
+                row = "".join(("{:>12} | {N:>7g} {sum_w:>11g} {mean:>11g} ", 
+                               "{sd:>10g} {min:>10g} {max:>10g}"))
+                zero_row = "{:>12} |       0           0"
+                
+                tplt = (header, sepline, row, zero_row)
+                            
+        return tplt
+        
+    def _summ_meanonly(self, wt_index, wt_type, obs, varnames, indexes):
+        """do summary if meanonly"""
+        zero_info = {'N': 0, 'sum_w': 0, 'sum': 0, 
+                     'key_order': ('N', 'sum_w', 'sum')}
+        index = indexes[-1]
+        
+        if self._isnumvar(index):
+            info = self._summ_stats_meanonly(index, wt_index, wt_type, obs)
+        else:
+            info = zero_info
+            
+        self._return_values = info if info["N"] != 0 else zero_info
+        
+    def _summ_detail(self, wt_index, wt_type, obs, varnames, indexes):
+        """do summary if detail"""
+        zero_info = {'N': 0, 'sum_w': 0, 'sum': 0, 
+                     'key_order': ('N', 'sum_w', 'sum')}
+        isnumvar = self._isnumvar
+        summ_stats = self._summ_stats_detail
+        vlblist = self._vlblist
+        
+        header, var_tplt = self._summ_template(detail=True)
+        print("")
+        for i, (name, index) in enumerate(zip(varnames, indexes)):
+            if isnumvar(index):
+                info, vals = summ_stats(index, wt_index, wt_type, obs)
+            else:
+                info = zero_info
+            
+            label = vlblist[index]
+            label = label[:60] if label != "" else name
+            label = "".join((" " * (30 - floor(len(label)/2)), label))
+            print(header.format(label))
+            if info["N"] != 0:
+                print(
+                    var_tplt.format(
+                        info['p1'], vals[0], 
+                        info['p5'], vals[1], 
+                        info['p10'], vals[2], info['N'], 
+                        info['p25'], vals[3], info['sum_w'], 
+                        info['p50'], info['mean'], 
+                        info['sd'], 
+                        info['p75'], vals[-4], 
+                        info['p90'], vals[-3], info['Var'], 
+                        info['p95'], vals[-2], info['skewness'], 
+                        info['p99'], vals[-1], info['kurtosis']
+                    )
+                )
+            else:
+                print("no observations")
+           
+            print("")
+        
+        self._return_values = info if info["N"] != 0 else zero_info
+    
+    def _summ_default(self, wt_index, wt_type, obs, 
+                      varnames, indexes, separator):
+        """do summary if not detail and not meanonly"""
+        zero_info = {'N': 0, 'sum_w': 0, 'sum': 0, 
+                     'key_order': ('N', 'sum_w', 'sum')}
+        isnumvar = self._isnumvar
+        summ_stats = self._summ_stats_default
+        
+        tplt = self._summ_template(wt_index, wt_type)
+        header, sepline, row_tplt, zero_row = tplt
+        print(header)
+        for i, (name, index) in enumerate(zip(varnames, indexes)):
+            if i % separator == 0: print(sepline)
+            
+            if isnumvar(index):
+                info = summ_stats(index, wt_index, wt_type, obs)
+            else:
+                info = zero_info
+            
+            if info["N"] != 0:
+                print(row_tplt.format(name, **info))
+            else:
+                print(zero_row.format(name))
+        
+        print("")
+        self._return_values = info if info["N"] != 0 else zero_info
         
     def _check_summ_args(self, detail=False, meanonly=False, separator=5, 
                          quietly=False, weight=None, fweight=None, 
@@ -984,11 +1059,13 @@ class Dta():
                 separator = 5
             
         return obs, (wt_type, wt_index), detail, meanonly, quietly, separator
-            
+        
     def summarize(self, varnames="", *args, **kwargs):
         """summarize given variables, 
-            or all variables if no varnames spacified.
-        available options:
+            or all variables if no varnames specified.
+        
+        it is recommended that you use keywords
+        when specifying any of these options:
             detail: bool, may not be combined with meanonly
             meanonly: bool, may not be combined with detail
             separator: int
@@ -1011,47 +1088,31 @@ class Dta():
         nvarnames = len(varnames)
         if nvarnames == 0:
             varnames = self._varlist
-            nvarnames = self._nvar
-            indexes = list(range(nvarnames))
+            indexes = list(range(self._nvar))
         else:
             indexes = list(map(self._varlist.index, varnames))
         
-        # if quietly, calculate for last var and return
-        if quietly:
-            self._single_summ(indexes[-1], wt_index, wt_type, obs,
-                              meanonly, detail, quietly, True)
-            return
-        
-        # loop through variables
+        # do the summ
         if meanonly:
-            for name, index, i in zip(varnames, indexes, range(nvarnames)):
-                self._single_summ(index, wt_index, wt_type, obs, 
-                                  meanonly, detail, quietly, 
-                                  do_return=(i == nvarnames - 1))
-        elif detail:
-            print("")
-            for name, index, i in zip(varnames, indexes, range(nvarnames)):
-                self._single_summ(index, wt_index, wt_type, obs,
-                                  meanonly, detail, quietly,
-                                  do_return=(i == nvarnames - 1))
-                print("")
-        else:
-            if wt_index is None or wt_type == 'f':
-                head_str = "".join(("\n{txt}    Variable {c |}       ",
-                    "Obs        Mean    Std. Dev.       Min        Max"))
-                sep_str = "{txt}{hline 13}{c +}{hline 56}"
+            self._summ_meanonly(wt_index, wt_type, obs, varnames, indexes)
+        elif quietly:
+            summ_stats = (self._summ_stats_detail 
+                          if detail 
+                          else self._summ_stats_default)
+            index = indexes[-1]
+            
+            if self._isnumvar(index):
+                info = summ_stats(index, wt_index, wt_type, obs)
             else:
-                head_str = "".join(("\n{txt}    Variable {c |}     Obs      ",
-                      "Weight        Mean   Std. Dev.       Min        Max"))
-                sep_str = "{txt}{hline 13}{c +}{hline 65}"
+                info = {'N': 0, 'sum_w': 0, 'sum': 0, 
+                        'key_order': ('N', 'sum_w', 'sum')}
             
-            print(head_str)
-            
-            for name, index, i in zip(varnames, indexes, range(nvarnames)):
-                if i % separator == 0: print(sep_str)
-                self._single_summ(index, wt_index, wt_type, obs,
-                                  meanonly, detail, quietly,
-                                  do_return=(i == nvarnames - 1))
+            self._return_values = info
+        elif detail:
+            self._summ_detail(wt_index, wt_type, obs, varnames, indexes)
+        else:
+            self._summ_default(wt_index, wt_type, obs, 
+                               varnames, indexes, separator)
             
     summ = summarize
         
