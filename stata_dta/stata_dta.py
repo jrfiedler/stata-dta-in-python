@@ -44,7 +44,7 @@ MONTH_ABBREV = {1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May', 6: 'Jun',
 
 class Dta():
     """A Python parent class for Stata datasets. 
-    Sub-classes inplement methods for particular versions.
+    Sub-classes implement methods for particular versions.
     
     """
     def __init__(self, *args, **kwargs):
@@ -69,7 +69,7 @@ class Dta():
             raise TypeError("Dta cannot be created from these arguments:")
         
     def _new_from_dta(self, old_dta, sel_rows=None, sel_cols=None):
-        """create data object by subscripting other data object"""
+        """create data object by subscripting another data object"""
         sel_rows = sel_rows if sel_rows is not None else range(old_dta._nobs)
         sel_cols = sel_cols if sel_cols is not None else range(old_dta._nvar)
         
@@ -143,7 +143,27 @@ class Dta():
             print("(" + self._data_label + ")")
         
     def save(self, address=None, replace=False):
-        """save current dataset as dta file"""
+        """Save current Dta object as dta file.
+        
+        Parameters
+        ----------
+        address : str
+            Address of file to save to.
+            Optional if Dta object was created from file
+            or has been saved already, otherwise required.
+        replace : bool
+            Optional, default value is False.
+            True is required to write over existing file.
+        
+        Returns
+        -------
+        None
+        
+        Side effects
+        ------------
+        creates or replaces dta file
+        
+        """
         if address is None:
             if not hasattr(self, "_fullpath"):
                 raise ValueError("address or filename needed")
@@ -185,12 +205,34 @@ class Dta():
                         d.day, MONTH_ABBREV[d.month], d.year, d.hour, d.minute)
         
     def ismissing(self, item):
-        """determine if item qualifies as a missing value"""
+        """Determine if item qualifies as a numeric missing value.
+        
+        Parameters
+        ----------
+        item : None, int, float, or MissingValue instance
+        
+        Returns
+        -------
+        bool
+        
+        Notes
+        ------
+        This function is not meant to be used with non-numeric or 
+        non-real values, and will raise an error when given such.
+        
+        """
         return (item is None or isinstance(item, MissingValue) 
                 or not (SMALLEST_NONMISSING <= item <= LARGEST_NONMISSING))
         
     def to_list(self):
-        """return data values as list of lists, one sub-list for each row"""
+        """Return list of data observations.
+        
+        Returns
+        -------
+        list
+            List of observations, each of which is also a list.
+        
+        """
         return copy.deepcopy(self._varvals)
         
     def _find_vars(self, varnames, unique=False, evars=False, all_ok=False, 
@@ -287,9 +329,20 @@ class Dta():
                 if m[1] not in seen and not seen.add(m[1])]
                 
     def return_list(self):
-        """analog of -return list-"""
+        """Display any saved results for this dta object.
+        
+        Returns
+        -------
+        None
+        
+        Side effects
+        ------------
+        Displays contents of saved results, if any.
+        
+        """
         if (not hasattr(self, '_return_values') or not self._return_values or 
                 not isinstance(self._return_values, dict)):
+            print("")
             return
         rv = self._return_values
         keys = rv.keys if 'key_order' not in rv else rv['key_order']
@@ -301,20 +354,45 @@ class Dta():
         if not IN_STATA: print("")
     
     def index(self, varname):
-        """get index in varlist of given dataset variable"""
+        """Get index of given data variable.
+        
+        Parameters
+        ----------
+        varname : str
+            Single varname (abbreviation allowed if unambiguous).
+        
+        Returns
+        -------
+        int
+            Index of variable in data set.
+        
+        """
         if not isinstance(varname, str):
             raise TypeError("argument must be str")
         varname = self._find_vars(varname, empty_ok=False, single=True)[0]
         return self._varlist.index(varname)
         
     def variable(self, id):
-        """return list of values for variable with given name or index"""
+        """Get a list of all values of a data variable.
+        
+        Parameters
+        ----------
+        id : int or str
+            Single variable index (int) or name (str).
+            For str, an abbreviation is allowed if unambiguous.
+        
+        Returns
+        -------
+        list
+            List of values of the specified data variable.
+        
+        """
         if isinstance(id, str):
             varname = self._find_vars(id, empty_ok=False, single=True)[0]
             col = self._varlist.index(varname)
         elif isinstance(id, int):
             if not -self._nvar <= id < self._nvar:
-                raise ValueError("column index out of range")
+                raise ValueError("data variable index out of range")
             col = id if id >= 0 else self._nvar + id
         else:
             raise TypeError("argument must be str name or int column index")
@@ -334,8 +412,22 @@ class Dta():
         return name[:space - 2] + "~" + name[-1]
         
     def rename(self, oldname, newname):
-        """Replace old variable name with new name.
-        Both oldname and newname should be str.
+        """Replace old variable name with new.
+        
+        Parameters
+        ----------
+        oldname : str
+            Single variable name (abbreviation allowed if unambiguous).
+        newname : str
+            New variable name.
+        
+        Returns
+        -------
+        None
+        
+        Side effects
+        ------------
+        Replace old data variable name with new.
         
         """
         if not isinstance(oldname, str) or not isinstance(newname, str):
@@ -363,7 +455,24 @@ class Dta():
         self._changed = True
         
     def set_obs(self, num_obs):
-        """Set number of observations. Must be >= current number of obs."""
+        """Increase number of observations in data set.
+        
+        Parameters
+        ----------
+        num_obs : int
+            Number of observations to increase to.
+        
+        Returns
+        -------
+        None
+        
+        Side effects
+        ------------
+        Changes number of observations. Appends observations with
+        MissingValue instance for numeric variables, "" for string.
+        Marks data as unsorted.
+        
+        """
         curr_obs = self._nobs
         if num_obs < curr_obs:
             raise ValueError("num_obs must be >= " + str(curr_obs))
@@ -383,10 +492,25 @@ class Dta():
         self._srtlist = [None]*self._nvar
         
     def drop_obs(self, in_ = None, if_ = None, all_obs = False):
-        """drop observations (remove rows from dataset) according to
-        in_, an iterable of values
-        if_, a function returning Boolean (or coercible to Boolean), or
-        all_obs, Boolean or coercible to Boolean
+        """Drop observations from the data set.
+        
+        Parameters
+        ----------
+        in_ : iterable, optional
+            Iterable of int values. Default is all observations.
+        if_ : function, optional
+            Should be a function taking int and returning Boolean 
+            (or coercible to Boolean). Default is True for all obs.
+        all_obs : bool or coercible to Boolean, optional
+            Option to drop all observations. Default value is False.
+        
+        Returns
+        -------
+        None
+        
+        Side effects
+        ------------
+        Deletes specified observations.
         
         """
         if self._nobs == 0:
@@ -413,9 +537,23 @@ class Dta():
         self._changed = True
             
     def keep_obs(self, in_ = None, if_ = None):
-        """keep observations (remove all other observations) according to 
-        in_, an iterable of values
-        if_, a function returning Boolean (or coercible to Boolean)
+        """Keep specified observations, remove all others.
+        
+        Parameters
+        ----------
+        in_ : iterable, optional
+            Iterable of int values. Default is all observations
+        if_ : function, optional
+            Should be a function taking int and returning Boolean 
+            (or coercible to Boolean). Default is True for all obs.
+        
+        Returns
+        -------
+        None
+        
+        Side effects
+        ------------
+        Deletes all observations except those specified.
         
         """
         if self._nobs == 0:
@@ -432,8 +570,24 @@ class Dta():
         self._changed = True
         
     def drop_var(self, varnames):
-        """Delete specified variables. Variables should be specified 
-        as one or more abbreviations in a single str or iterable of str.
+        """Delete specified variable(s).
+        
+        Parameters
+        ----------
+        varnames : str, or iterable of str
+            Can be a str containing one varname (e.g., "mpg"),
+            a str with multiple varnames (e.g., "make price mpg"),
+            or an iterable of such str
+            (e.g., ("make", "price", "mpg") or ("make", "price mpg")).
+            Abbreviations are allowed if unambiguous.
+        
+        Returns
+        -------
+        None
+        
+        Side effects
+        ------------
+        Deletes specified data variables.
         
         """
         drop_vars = self._find_vars(varnames, unique=True, empty_ok=False)
@@ -482,8 +636,24 @@ class Dta():
     drop_vars = drop_var
         
     def keep_var(self, varnames):
-        """Keep specified variables and delete rest.
-        Variables should be specified as str or iterable of str.
+        """Keep specified variable(s), delete all others.
+        
+        Parameters
+        ----------
+        varnames : str, or iterable of str
+            Can be a str containing one varname (e.g., "mpg"),
+            a str with multiple varnames (e.g., "make price mpg"),
+            or an iterable of such str
+            (e.g., ("make", "price", "mpg") or ("make", "price mpg")).
+            Abbreviations are allowed if unambiguous.
+        
+        Returns
+        -------
+        None
+        
+        Side effects
+        ------------
+        Deletes data variables other than those specified.
         
         """
         varnames = self._find_vars(varnames, empty_ok=False)
@@ -986,6 +1156,7 @@ class Dta():
                      'key_order': ('N', 'sum_w', 'sum')}
         isnumvar = self._isnumvar
         summ_stats = self._summ_stats_default
+        squish_name = self._squish_name
         
         tplt = self._summ_template(wt_index, wt_type)
         header, sepline, row_tplt, zero_row = tplt
@@ -998,10 +1169,12 @@ class Dta():
             else:
                 info = zero_info
             
+            small_name = squish_name(name, 12)
+            
             if info["N"] != 0:
-                print(row_tplt.format(name, **info))
+                print(row_tplt.format(small_name, **info))
             else:
-                print(zero_row.format(name))
+                print(zero_row.format(small_name))
         
         print("")
         self._return_values = info if info["N"] != 0 else zero_info
@@ -1061,25 +1234,64 @@ class Dta():
         return obs, (wt_type, wt_index), detail, meanonly, quietly, separator
         
     def summarize(self, varnames="", *args, **kwargs):
-        """summarize given variables, 
-            or all variables if no varnames specified.
+        """Summarize data variables.
         
-        it is recommended that you use keywords
-        when specifying any of these options:
-            detail: bool, may not be combined with meanonly
-            meanonly: bool, may not be combined with detail
-            separator: int
-            quietly: bool
-            weight: str varname; may not be combined with other weights
-            aweight: str varname; may not be combined with other weights
-            fweight: str varname; may not be combined with other weights;
-                    given Stata variable must be int
-            iweight: str varname; may not be combined with other weights;
-                    may not be combined with detail option
-            in_: iterable of int
-            if_: function taking single int and returning bool
+        Summarize specified variable(s), or, if no variables specified,
+        summarize all variables.
         
-        """        
+        Parameters
+        ----------
+        varnames : str, or iterable of str, optional
+            Default is none specified (i.e., summarize all).
+            Can be a str containing one varname (e.g., "mpg"),
+            a str with multiple varnames (e.g., "make price mpg"),
+            or an iterable of such str
+            (e.g., ("make", "price", "mpg") or ("make", "price mpg")).
+            Abbreviations are allowed if unambiguous.
+        detail : bool (or coercible to bool)
+            May not be combined with `meanonly`.
+        meanonly : bool (or coercible to bool)
+            May not be combined with `detail`.
+        separator : int
+            Number of summaries to group together with dividing line.
+            Has no effect
+        quietly : bool (or coercible to bool)
+            Create summary, but do not display. Useful if only wanting
+            to save summary results, to be displayed with `return_list`.
+        weight : str 
+            Single varname (or abbreviation). 
+            May not be combined with other weights.
+        aweight : str 
+            Single varname (or abbreviation). 
+            May not be combined with other weights.
+        fweight : str 
+            Single varname (or abbreviation), of an integer variable. 
+            May not be combined with other weights.
+        iweight : str 
+            Single varname (or abbreviation). 
+            May not be combined with other weights.
+            May not be combined with `detail` option.
+        in_ : iterable, optional
+            Iterable of int values. Default is all observations.
+        if_ : function, optional
+            Should be a function taking int and returning Boolean 
+            (or coercible to Boolean). Default is True for all obs.
+            
+        Parameters note
+        ---------------
+        Above parameters can be accessed by name.
+        Otherwise, the parameters appear in the above order.
+        
+        Returns
+        -------
+        None
+        
+        Side effects
+        ------------
+        Displays summary of specified variable(s). Saves the values
+        from the last summary, which can be displayed with `return_list'.
+        
+        """
         (obs, (wt_type, wt_index), detail,
          meanonly, quietly, separator) = self._check_summ_args(*args, **kwargs)
          
@@ -1117,8 +1329,24 @@ class Dta():
     summ = summarize
         
     def sort(self, varnames):
-        """Sort data values in order of given variables.
-        Any duplicates in varnames will be ignored.
+        """Sort data values according to given variables.
+        
+        Parameters
+        ----------
+        varnames : str, or iterable of str
+            Can be a str containing one varname (e.g., "mpg"),
+            a str with multiple varnames (e.g., "make price mpg"),
+            or an iterable of such str
+            (e.g., ("make", "price", "mpg") or ("make", "price mpg")).
+            Abbreviations are allowed if unambiguous.
+        
+        Returns
+        -------
+        None
+        
+        Side effects
+        ------------
+        Sorts observations of the data set.
         
         """
         varnames = self._find_vars(varnames, unique=True, empty_ok=False)
@@ -1272,7 +1500,35 @@ class Dta():
         return obs, separator
     
     def list(self, varnames="", **kwargs):
-        """print table of data values"""
+        """Print table of data values.
+        
+        Print table of values for specified variable(s), or all
+        variables if none specified. 
+        
+        Parameters
+        ----------
+        varnames : str, or iterable of str, optional
+            Default is none specified (i.e., list all).
+            Can be a str containing one varname (e.g., "mpg"),
+            a str with multiple varnames (e.g., "make price mpg"),
+            or an iterable of such str
+            (e.g., ("make", "price", "mpg") or ("make", "price mpg")).
+            Abbreviations are allowed if unambiguous.
+        in_ : iterable, optional
+            Iterable of int values. Default is all observations.
+        if_ : function, optional
+            Should be a function taking int and returning Boolean 
+            (or coercible to Boolean). Default is True for all obs.
+        
+        Returns
+        -------
+        None
+        
+        Side effects
+        ------------
+        Displays table of values.
+        
+        """
         varnames = self._find_vars(varnames, empty_ok=True)
         if len(varnames) == 0:
             varnames = self._varlist
@@ -1336,7 +1592,42 @@ class Dta():
     def order(self, varnames, last=False, 
               before=None, after=None, alpha=False):
         """Change order of varlist.
+        
         Any duplicates in varnames will be ignored.
+        
+        Parameters
+        ----------
+        varnames : str, or iterable of str
+            Can be a str containing one varname (e.g., "mpg"),
+            a str with multiple varnames (e.g., "make price mpg"),
+            or an iterable of such str
+            (e.g., ("make", "price", "mpg") or ("make", "price mpg")).
+            Abbreviations are allowed if unambiguous.
+        last : bool (or coercible to bool), optional
+            Signal that specified variables should come last in the
+            varlist instead of first. Default is False.
+            May not be combined with `before` or `after`.
+        before : str, optional
+            Name of variable to put the specified variables before.
+            An abbreviation is allowed if unambiguous.
+            By default this option is turned off.
+            May not be combined with `last' or `after'
+        after : str, optional
+            Name of variable to put the specified variables after.
+            An abbreviation is allowed if unambiguous.
+            By default this option is turned off.
+            May not be combined with `last' or `before'
+        alpha : bool (or coercible to bool), optional
+            Signal that varlist should be sorted alphabetically 
+            before rearranging. Default is False.
+        
+        Returns
+        -------
+        None
+        
+        Side effects
+        ------------
+        Reorders varlist.
         
         """
         # check for bad combinations of options
@@ -1410,10 +1701,27 @@ class Dta():
         self._changed = True
         
     def clonevar(self, oldname, newname):
-        """Generate newname variable that is exact copy of oldname,
-          including label, value label, notes, and characteristics.
-          oldname and newname should be strings.
-          
+        """Create a data variable into a new variable.
+        
+        New data variable will have the same data values, display format,
+        labels, value labels, notes, and characteristics.
+        
+        Parameters
+        ----------
+        oldname : str
+            Single variable name (abbreviation allowed if unambiguous).
+        newname : str
+            New variable name.
+        
+        Returns
+        -------
+        None
+        
+        Side effects
+        ------------
+        Creates new variable. Copies data values, display format, 
+        labels, value labels, notes, and characteristics.
+        
         """
         if not isinstance(oldname, str) or not isinstance(newname, str):
             raise TypeError("old and new variable names should be str")
@@ -1447,31 +1755,46 @@ class Dta():
         self._typlist.append(num)
        
         #Copy Display Format of New Variable from Old
-        distype=self._fmtlist[index_old]
+        distype = self._fmtlist[index_old]
         self._fmtlist.append(distype)
 
         #Copy Label List
-        labellist=self._lbllist[index_old]
+        labellist = self._lbllist[index_old]
         self._lbllist.append(labellist)
 
         #Copy variable labels
-        varlab=self._vlblist[index_old]
+        varlab = self._vlblist[index_old]
         self._vlblist.append(varlab)
         
-        #Copy note information to new from old
+        #Copy characeristics
         if oldname in self._chrdict:
-            notes=self._chrdict[oldname].copy()
-            self._chrdict[newname]=notes
+            chars = self._chrdict[oldname].copy()
+            self._chrdict[newname] = chars
 
         # increment self._nvar by 1
-        self._nvar=self._nvar + 1 
+        self._nvar = self._nvar + 1 
     
-        self._changed=True
+        self._changed = True
         
-    def append_obs(self,value):
-        """Append list of observations to the end of the dataset.
-        Only accepts observations with no missing data.
-        Accepts multiple observations
+    def append_obs(self, value):
+        """Append observations to the end of the dataset.
+        
+        Parameters
+        ----------
+        value : iterable
+            Should be an iterable of iterables, one sub-iterable
+            per observation. The observations should contain as
+            many values as there are variables in the data set,
+            and the values should have correct type.
+        
+        Returns
+        -------
+        None
+        
+        Side effects
+        ------------
+        Creates new observations in the data set, and inputs the given
+        values into those observations.
         
         """
         
@@ -1505,10 +1828,30 @@ class Dta():
        
         # self._changed set to True in set_obs
         
-    def replace(self, id, values, in_=None, if_=(lambda i: True)):
-        """Replace single variable with given id (str name or int index)
-        and given iterable of values. This function might be removed 
-        from later versions of this class.
+    def replace(self, id, values, in_=None, if_=None):
+        """Replace values in given data variable. 
+        
+        Parameters
+        ----------
+        id : int or str
+            Single variable index (int) or name (str).
+            For str, an abbreviation is allowed if unambiguous.
+        values : iterable
+            Can be a flat iterable like [1, 5, 9, ...] or iterable of
+            rows, like [[1], [5], [9], ...].
+        in_ : iterable, optional
+            Iterable of int values. Default is all observations.
+        if_ : function, optional
+            Should be a function taking int and returning Boolean 
+            (or coercible to Boolean). Default is True for all obs.
+        
+        Returns
+        -------
+        None
+        
+        Side effects
+        ------------
+        Replaces values in given data variable.
         
         """
         # argument checking will be done with __setitem__
@@ -1516,7 +1859,10 @@ class Dta():
         if in_ is None:
             in_ = range(self._nobs)
         
-        rows = [i for i in in_ if if_(i)]
+        if if_ is None:
+            rows = tuple(in_)
+        else:
+            rows = tuple(i for i in in_ if if_(i))
         
         # type and size checking happens in __setitem__
         self.__setitem__((rows, id), values)
@@ -1524,8 +1870,34 @@ class Dta():
         # __setitem__ will set self._changed = True if appropriate
 
     def note_add(self, evarname, note, replace=False, in_=None):
-        """Adds given note to varname or '_dta', replacing note if spacified.
-        Note will be truncated to 67,784 characters.
+        """Add given note for varname or '_dta', 
+        or replacing existing note if specified.
+        
+        Note will be truncated to 67,784 characters if necessary.
+        
+        Parameters
+        ----------
+        evarname : str
+            Name of data variable or '_dta'.
+            An abbreviation of a variable name is allowed if unambiguous.
+        note : str
+            Text to insert.
+        replace : bool (or coercible to bool), optional
+            Specify that existing note should be replaced.
+            If `replace` is True, `in_` must be specified as well.
+            Otherwise, `replace` will be ignored.
+            Default value is False.
+        in_ : int, optional
+            Note number to replace (>= 1).
+            Only used if `replace` is True.
+        
+        Returns
+        -------
+        None
+        
+        Side effects
+        ------------
+        Inserts text as new note or replacement for old note.
         
         """
         if not isinstance(note, str):
@@ -1537,6 +1909,8 @@ class Dta():
         if replace:
             if not isinstance(in_, int):
                 raise TypeError("in_ should be int or None")
+            if in_ <= 0:
+                raise ValueError("note numbers must be >= 1")
             if (evarname not in self._chrdict 
                   or 'note0' not in self._chrdict[evarname] 
                   or 'note' + str(in_) not in self._chrdict[evarname]):
@@ -1569,9 +1943,27 @@ class Dta():
     notes_add = note_add
         
     def note_replace(self, evarname, note, in_):
-        """For given evarname (varname or '_dta'), 
-        replace note in given number. note will be truncated 
-        to 67,784 characters.
+        """Replace existing note for varname or '_dta'.
+        
+        Note will be truncated to 67,784 characters if necessary.
+        
+        Parameters
+        ----------
+        evarname : str
+            Name of data variable or '_dta'.
+            An abbreviation of a variable name is allowed if unambiguous.
+        note : str
+            Text to insert.
+        in_ : int
+            Note number to replace (>= 1).
+        
+        Returns
+        -------
+        None
+        
+        Side effects
+        ------------
+        Inserts text as replacement for old note.
         
         """
         self.note_add(evarname, note, replace=True, in_=in_)
@@ -1579,7 +1971,23 @@ class Dta():
     notes_replace = note_replace
         
     def note_renumber(self, evarname):
-        """remove gaps in note numbering for given variable name or '_dta'"""
+        """Remove gaps in note numbers.
+        
+        Parameters
+        ----------
+        evarname : str
+            Name of data variable or '_dta'.
+            An abbreviation of a variable name is allowed if unambiguous.
+        
+        Returns
+        -------
+        None
+        
+        Side effects
+        ------------
+        Renumbers notes if necessary.
+        
+        """
         names = self._find_vars(evarname, evars=True,
                                 empty_ok=False, single=True)
         evarname = names[0]
@@ -1610,9 +2018,24 @@ class Dta():
         
     def note_drop(self, evarnames, in_=None):
         """Drop notes in given numbers for given evarnames.
-        in_ should be an int or iterable of ints.
-        evarnames (variable names or '_dta') should be a string 
-            or an iterable of strings.
+        
+        Parameters
+        ----------
+        evarnames : str or iterable of str
+            Names of data variable(s) or '_dta'.
+            Abbreviations of variable names are allowed if unambiguous.
+        in_ : int or iterable of int, optional
+            Note number(s) to drop (>= 1).
+            If `in_' not specified or is None, all notes will be dropped
+            for given evarnames.
+        
+        Returns
+        -------
+        None
+        
+        Side effects
+        ------------
+        Deletes notes.
         
         """
         if in_ is not None:
@@ -1621,6 +2044,12 @@ class Dta():
             elif (not isinstance(in_, collections.Iterable)
                     or not all(isinstance(n, int) for n in in_)):
                 raise TypeError("in_ should be int or iterable of int")
+            if any(n <= 0 for n in in_):
+                raise ValueError("note numbers must be >= 1")
+        else:
+            in_ = ()
+            
+        in_intersect = set(in_).intersection
         
         evarnames = self._find_vars(evarnames, evars=True, empty_ok=False)
         chrdict = self._chrdict
@@ -1630,10 +2059,8 @@ class Dta():
             
             if 'note0' not in chars: continue
             
-            note_nums = {int(key[4:])
-                        for key in chars if key.startswith("note")}
-            drop_nums = (set(in_).intersection(note_nums) 
-                        if in_ is not None else note_nums)
+            note_nums = {int(k[4:]) for k in chars if k.startswith("note")}
+            drop_nums = in_intersect(note_nums) if in_ else note_nums
             
             if len(drop_nums) == 0: continue            
             
@@ -1660,10 +2087,24 @@ class Dta():
         
     def note_list(self, evarnames="", in_=None):
         """List notes in given numbers for given evarnames.
-        Note numbers should be specified as a single int or iterable 
-            of ints.
-        Variable names (or _dta) should be specified as one or more  
-            names in a single string or an iterable of such strings.
+        
+        Parameters
+        ----------
+        evarnames : str or iterable of str
+            Names of data variable(s) or '_dta'.
+            Abbreviations of variable names are allowed if unambiguous.
+        in_ : int or iterable of int, optional
+            Note number(s) to drop (>= 1).
+            If `in_' not specified or is None, all notes will be dropped
+            for given evarnames.
+        
+        Returns
+        -------
+        None
+        
+        Side effects
+        ------------
+        Displays notes.
         
         """
         evarnames = self._find_vars(evarnames, evars=True, 
@@ -1676,6 +2117,8 @@ class Dta():
             elif (not isinstance(in_, collections.Iterable)
                     or not all(isinstance(n, int) for n in in_)):
                 raise TypeError("in_ should be int or iterable of int")
+            if any(n <= 0 for n in in_):
+                raise ValueError("note numbers must be >= 1")
         for name in evarnames:
             if name not in self._chrdict: continue
             chars = self._chrdict[name]
@@ -1718,7 +2161,21 @@ class Dta():
             print("{{text}}{:>3}. {}".format(num, chars['note' + str(num)]))
         
     def note_search(self, text):
-        """search in notes for exact matches of given text"""
+        """Search in notes for exact matches of given text.
+        
+        Parameters
+        ----------
+        text : str
+        
+        Returns
+        -------
+        None
+        
+        Side effects
+        ------------
+        Displays notes matching text.
+        
+        """
         if not isinstance(text, str):
             raise TypeError("search argument should be str")
         search_in_notes = self._search_in_notes
@@ -2448,11 +2905,34 @@ class Dta():
         return len(self._varvals)
         
     def format(self, varnames, fmts):
-        """Set the Stata display format of given vars.
-        If len(fmts) < len(varnames) the last fmt is repeated.
-        If len(fmts) > len(varnames) the extra fmts are ignored.
-        If variables are repeated the rightmost assignment sticks.
-        The varnames and fmts should each be str or iterable of str.
+        """Set the Stata display format of given data variables.
+        
+        Parameters
+        ----------
+        varnames : str, or iterable of str
+            Can be a str containing one varname (e.g., "mpg"),
+            a str with multiple varnames (e.g., "make price mpg"),
+            or an iterable of such str
+            (e.g., ("make", "price", "mpg") or ("make", "price mpg")).
+            Abbreviations are allowed if unambiguous.
+        fmts : str, or iterable of str
+            Can be a str containing one format (e.g., "%9.2f"),
+            a str with multiple formats (e.g., "%9.2f %12s %9.0g"),
+            or an iterable of such str
+            (e.g., ("%9.2f", "%12s", "%9.0g") or ("%9.2f", "%12s %9.0g")).
+        
+        Notes
+        -----
+        If there are fewer formats than varnames, the last format will
+        be repeated. Any extraneous formats will be ignored.
+        
+        Returns
+        -------
+        None
+        
+        Side effects
+        ------------
+        Sets the display format of the given data variables.
         
         """
         varnames = self._find_vars(varnames, empty_ok=False)
@@ -2496,7 +2976,13 @@ class Dta():
         self._changed = True
         
     def copy(self):
-        """return a Dta instance that is a copy of the current instance"""
+        """Create a copy of the current Dta instance.
+        
+        Returns
+        -------
+        Dta instance
+        
+        """
         c = type(self)(self) # using self's constructor on self
         c._srtlist = self._srtlist.copy() # srtlist is not copied in __init__
         return c
@@ -2539,7 +3025,25 @@ class Dta():
         
     def check(self, version=None):
         """Determine whether saved data set conforms to limits of 
-        given Stata version. See -help limits- in Stata for more info.
+        given Stata version. 
+        
+        See -help limits- in Stata for more info.
+        
+        Parameters
+        ----------
+        version : int, optional
+            Specify a version to check against.
+            Default is to check against version implied by instance
+            (e.g., version 115 if instance of Dta115)
+        
+        Returns
+        -------
+        None
+        
+        Side effects
+        ------------
+        Display summary of limits violations, if any.
+        
         """
         
         if version is None:
@@ -3370,10 +3874,33 @@ class Dta115(Dta):
         self._changed = True
         
     def append_var(self, name, values, st_type=None, compress=True):
-        """Append values as variable with given name.
-        Values should be in a non-string iterable.
-        If dataset contains 1 observation, non-iterable 
-        or single str allowed.
+        """Add new variable to data set.
+        
+        Parameters
+        ----------
+        name : str
+            Name of variable to be created.
+        values : iterable
+            Should be a flat iterable like [1, 5, 9, ...] or
+            (1, 5, 9, ...). Not like [[1], [5], [9], ...].
+        st_type : int or str, optional
+            Examples: 212 or "str212", 254 or "float".
+            Intended Stata type of the data variable. 
+            The intended type will be overridden when necessary.
+            Default value depends on the given values.
+        compress : bool (or coercible to bool), optional
+            If st_type is None, this sets st_type to byte if 
+            compress=True, or float if compress=False.
+            Using compress=True can result in smaller files.
+            Default value is True.
+        
+        Returns
+        -------
+        None
+        
+        Side effects
+        ------------
+        Adds new variable to data set.
         
         """
         global get_missing
@@ -3383,7 +3910,7 @@ class Dta115(Dta):
             if self._nobs <= 1:
                 values = [values]
             else:
-                raise TypeError("added variable must be an iterable")
+                raise TypeError("values to add must be in an iterable")
         if not isinstance(name, str):
             raise TypeError("variable name must be str")
         
@@ -3609,7 +4136,14 @@ class Dta115(Dta):
         
     @property
     def width(self):
-        """return width of dataset as saved"""
+        """Width of an observation as saved.
+        
+        Returns
+        -------
+        int
+            Width of a single observation in bytes.
+        
+        """
         widths = { 251: 1, 252: 2, 253: 4, 254: 4, 255: 8 }
         return sum([0] + [t if t < 245 else widths[t] for t in self._typlist])
             
@@ -4107,10 +4641,33 @@ class Dta117(Dta):
         self._changed = True
         
     def append_var(self, name, values, st_type=None, compress=True):
-        """Append values as variable with given name.
-        Values should be in a non-string iterable.
-        If dataset contains 1 observation, non-iterable 
-        or single str allowed.
+        """Add new variable to data set.
+        
+        Parameters
+        ----------
+        name : str
+            Name of variable to be created.
+        values : iterable
+            Should be a flat iterable like [1, 5, 9, ...] or
+            (1, 5, 9, ...). Not like [[1], [5], [9], ...].
+        st_type : int or str, optional
+            Examples: 212 or "str212", 65527 or "float".
+            Intended Stata type of the data variable. 
+            The intended type will be overridden when necessary.
+            Default value depends on the given values.
+        compress : bool (or coercible to bool), optional
+            If st_type is None, this sets st_type to byte if 
+            compress=True, or float if compress=False.
+            Using compress=True can result in smaller files.
+            Default value is True.
+        
+        Returns
+        -------
+        None
+        
+        Side effects
+        ------------
+        Adds new variable to data set.
         
         """
         global get_missing
@@ -4120,7 +4677,7 @@ class Dta117(Dta):
             if self._nobs <= 1:
                 values = [values]
             else:
-                raise TypeError("added variable must be an iterable")
+                raise TypeError("values to add must be in an iterable")
         if not isinstance(name, str):
             raise TypeError("variable name must be str")
         
@@ -4364,7 +4921,14 @@ class Dta117(Dta):
         
     @property
     def width(self):
-        """return width of dataset as saved"""
+        """Width of an observation as saved.
+        
+        Returns
+        -------
+        int
+            Width of a single observation in bytes.
+        
+        """
         widths = {65530: 1, 65529: 2, 65528: 4, 65527: 4, 65526: 8, 32768: 8}
         return sum([0] + [t if t <= 2045 else widths[t] 
                    for t in self._typlist])
@@ -4759,7 +5323,26 @@ class Dta117(Dta):
 
 
 def display_diff(dta1, dta2, all_data=False):
-    """display detailed differences between two Dta objects"""
+    """Display summary of differences between two Dta objects.
+    
+    Parameters
+    ----------
+    dta1 : Dta instance
+    dta2 : Dta instance
+    all_data : bool (or coercible to bool), optional
+        Specify that all data values should be checked for
+        equality, rather than stopping at first inequality. 
+        Default value is False.
+    
+    Returns
+    -------
+    None
+    
+    Side effects
+    ------------
+    Displays summary of differences.
+    
+    """
     if not isinstance(dta1, Dta) or not isinstance(dta2, Dta):
         raise TypeError("objects to be compared must be Dta")
     
@@ -4894,8 +5477,15 @@ def display_diff(dta1, dta2, all_data=False):
 
 
 def open_dta(address):
-    """General function for opening any recent version dta file.
-    Will return instance of correct class (Dta115 or Dta117).
+    """Open any recent version dta file (versions 114, 115, 117) .
+    
+    Parameters
+    ----------
+    Address of file, including file name and ".dta".
+    
+    Returns
+    -------
+    Instance of sub-class of Dta, depending on dta file.
     
     """
     with open(address, 'rb') as dta_file:
