@@ -306,7 +306,7 @@ class Dta():
                 append([name, name] if name in match else [name] + match)
                   
         # abbreviation was a good, unambiguous abbreviation if exactly
-        # one match found, i.e., if the corresponding entry in -matches- 
+        # one match found, i.e. if the corresponding entry in -matches- 
         # is [abbrev, match1]
         if not all(len(m) == 2 for m in matches):
             # there were unmatched or ambiguous abbreviations
@@ -840,7 +840,7 @@ class Dta():
                     pos, pc = pospc[0]
                 else:           # these next three lines exit the for loop
                     continue    # if -break- encountered in the while loop
-                break           # i.e., if there are no more pcs to assign
+                break           # i.e. if there are no more pcs to assign
                 
             # in case there are any percentiles that haven't been assigned:
             for pos, pc in pospc:
@@ -1242,7 +1242,7 @@ class Dta():
         Parameters
         ----------
         varnames : str, or iterable of str, optional
-            Default is none specified (i.e., summarize all).
+            Default is none specified (i.e. summarize all).
             Can be a str containing one varname (e.g., "mpg"),
             a str with multiple varnames (e.g., "make price mpg"),
             or an iterable of such str
@@ -1508,7 +1508,7 @@ class Dta():
         Parameters
         ----------
         varnames : str, or iterable of str, optional
-            Default is none specified (i.e., list all).
+            Default is none specified (i.e. list all).
             Can be a str containing one varname (e.g., "mpg"),
             a str with multiple varnames (e.g., "make price mpg"),
             or an iterable of such str
@@ -1881,7 +1881,8 @@ class Dta():
             Name of data variable or '_dta'.
             An abbreviation of a variable name is allowed if unambiguous.
         note : str
-            Text to insert.
+            Note should be ascii ('iso-8859-1'). 
+            Otherwise, the note will not be saved as intended.
         replace : bool (or coercible to bool), optional
             Specify that existing note should be replaced.
             If `replace` is True, `in_` must be specified as well.
@@ -1953,7 +1954,8 @@ class Dta():
             Name of data variable or '_dta'.
             An abbreviation of a variable name is allowed if unambiguous.
         note : str
-            Text to insert.
+            Note should be ascii ('iso-8859-1'). 
+            Otherwise, the note will not be saved as intended.
         in_ : int
             Note number to replace (>= 1).
         
@@ -2154,11 +2156,17 @@ class Dta():
         """convenience function for self.note_search"""
         if note_info == []: return
         evarname = note_info[0]
-        print("")
-        print("{res}" + evarname)
         chars = self._chrdict[evarname]
+        
+        if IN_STATA:
+            tplt = "{{text}}{:>3}. {}"
+            print("\n{res}" + evarname)
+        else:
+            tplt = "{:>3}. {}"
+            print("\n" + evarname)
+        
         for num in note_info[1:]:
-            print("{{text}}{:>3}. {}".format(num, chars['note' + str(num)]))
+            print(tplt.format(num, chars['note' + str(num)]))
         
     def note_search(self, text):
         """Search in notes for exact matches of given text.
@@ -2188,14 +2196,31 @@ class Dta():
     notes_search = note_search
         
     def label_data(self, label):
-        """Adds given str label to data. 
-        Label will be truncated to 80 characters.
+        """Add given label to data. 
+        
+        Label will be truncated to 80 characters if necessary.
+        
+        Parameters
+        ----------
+        label : str
+            Label should be ascii ('iso-8859-1'). 
+            Otherwise, the label will not be saved as intended.
+        
+        Returns
+        -------
+        None
+        
+        Side effects
+        ------------
+        Adds label to data.
         
         """
         if not isinstance(label, str):
             raise TypeError("data label should be a string")
         if len(label) > 80:
-            print("{err}truncating label to 80 characters")
+            if IN_STATA:
+                print("{err}", end="")
+            print("truncating label to 80 characters")
             label = label[:80]
         if self._data_label == label:
             return
@@ -2203,8 +2228,25 @@ class Dta():
         self._changed = True
         
     def label_variable(self, varname, label):
-        """Adds a str label to a single variable.
-        Label will be truncated to 80 characters.
+        """Add given label to variable.
+        
+        Label will be truncated to 80 characters if necessary.
+        
+        Parameters
+        ----------
+        varname : str
+            Single varname (abbreviation allowed if unambiguous).
+        label : str
+            Label should be ascii ('iso-8859-1'). 
+            Otherwise, the label will not be saved as intended.
+        
+        Returns
+        -------
+        None
+        
+        Side effects
+        ------------
+        Adds label to variable.
         
         """
         if not isinstance(label, str):
@@ -2231,7 +2273,6 @@ class Dta():
         typlist = self._typlist
         isstrvar = self._isstrvar
         for i in indexes:
-            #if typlist[i] <= 244:
             if isstrvar(i):
                 continue # string values should not be labeled
             old_fmt = fmtlist[i]
@@ -2259,8 +2300,41 @@ class Dta():
         
     def label_define(self, name, mapping, 
             add=False, replace=False, modify=False, fix=True):
-        """define value labels, with given name (str) 
-        and mapping (dict of form value:label)
+        """Define a VALUE label, a mapping from numeric values to string.
+        
+        Parameters
+        ----------
+        name : str
+            Name of the value label, i.e. name of the mapping.
+            If a mapping with this name already exists, `add`, 
+            `replace`, or `modify` should be set to True.
+        mapping : dict
+            Keys should be int or float, dict values should be str.
+        add : bool (or coercible to bool), optional
+            Whether mapping should be added to existing mapping.
+            An error will be raised if old and new mapping share keys.
+            Default value is False.
+        replace : bool (or coercible to bool), optional
+            Whether mapping should replace existing mapping entirely.
+            Default value is False.
+        modify : bool (or coercible to bool), optional
+            Whether mapping should update existing mapping, i.e.
+            replace when there is an overlap in keys, add otherwise.
+            Default value is False.
+        fix : bool (or coercible to bool), optional
+            When replacing or modifying an existing mapping, this
+            determines whether display formats on any data variables 
+            that use this mapping should be expanded to accommodate 
+            the new labels, if necessary.
+            Default value is False.
+        
+        Returns
+        -------
+        None
+        
+        Side effects
+        ------------
+        Stores value -> label map in dataset (does not apply it).
         
         """
         if not isinstance(name, str):
@@ -2305,8 +2379,26 @@ class Dta():
         self._changed = True
     
     def label_copy(self, orig_name, copy_name, replace=False):
-        """Copy labels in orig_name to copy_name.
-        If copy_name exists, replace=True should be specified.
+        """Make a copy of mapping `orig_name` with name `copy_name`
+        
+        Parameters
+        ----------
+        orig_name : str
+            Name of the existing value label mapping.
+        copy_name : str
+            Name to be given to the copy.
+        replace : bool (or coercible to bool), optional
+            Whether the copy should replace an existing mapping.
+            Required if a mapping with name `copy_name` already exists.
+            Default value is False.
+        
+        Returns
+        -------
+        None
+        
+        Side effects
+        ------------
+        Stores or replaces a copy of a value -> label map in the data set.
         
         """
         if not isinstance(orig_name, str) or not isinstance(copy_name, str):
@@ -2321,16 +2413,38 @@ class Dta():
         self._changed = True
         
     def label_dir(self):
-        """display names of defined value labels"""
+        """Display names of defined value -> label maps
+        
+        Returns
+        -------
+        None
+        
+        Side effects
+        ------------
+        Displays names of existing value -> label maps.
+        
+        """
         for lblname in self._vallabs:
             print(lblname)
         
     def label_list(self, labnames=None):
-        """List value label pairs for given labels, 
-            or for all labels if none specified.
-        labnames (if specified) should be specified as one or more names 
-            in a single string or an iterable of such strings.
-            
+        """Show value, label pairs for given maps,
+        or for all such maps if none specified.
+        
+        Parameters
+        ----------
+        labnames : str or iterable of str, optional
+            One or more names of existing value -> label maps to display.
+            Default is to show all defined maps.
+        
+        Returns
+        -------
+        None
+        
+        Side effects
+        ------------
+        Displays value -> label maps.
+        
         """
         vallabs = self._vallabs
         if labnames is None:
@@ -2354,10 +2468,29 @@ class Dta():
                 print("{:>12} {}".format(value, lbldict[value]))
         
     def label_drop(self, labnames=None, drop_all=False):
-        """Drop value labels (i.e., remove mappings) with given names, 
-            or all labels if drop_all=True is specified.
-        labnames (if specified) should be specified as one or more names 
-            in a single string or an iterable of such strings.
+        """Delete value -> label maps from data set.
+        
+        Parameters
+        ----------
+        labnames : str or iterable of str, optional
+            One or more names of existing value -> label maps to display.
+        drop_all : bool (or coercible to bool), optional
+            Whether all value -> label maps should be dropped.
+            Default value is False.
+            
+        Note
+        ----
+        Nothing will be done if neither `labnames` nor `drop_all` are
+        specified. If both are specified, `drop_all' will be ignored.
+        
+        Returns
+        -------
+        None
+        
+        Side effects
+        ------------
+        Removes value -> label maps from data set. Association between
+        data variables and maps names are not removed.
         
         """
         vallabs = self._vallabs
@@ -2386,13 +2519,30 @@ class Dta():
         self._changed = True
         
     def label_values(self, varnames, labname, fix=True):
-        """For variables in varnames, attach label with given labname.
-        varnames should be str or iterable of str.
-        labname should be str.
-        fix determines whether variable fmts should be enlarged
-            if needed to accomodate sizes of labels.
-        Setting label name of a label that does not exist _is_ allowed.
-        To remove value labels from varnames, use "" or None as labname.
+        """Associate (possibly non-existent) value -> label map with
+        given data variables.
+        
+        Parameters
+        ----------
+        varnames : str or iterable of str
+            One or more names of data variables.
+            Abbreviations are allowed if unambiguous.
+        labname : str
+            Name of value -> label mapping to use with given variables.
+            `labname` does not need to be the name of an existing map.
+        fix : bool (or coercible to bool), optional
+            Whether the variables' display formats should be expanded 
+            to accommodate the labels, if necessary.
+            Default value is True.
+        
+        Returns
+        -------
+        None
+        
+        Side effects
+        ------------
+        Associates (possibly non-existent) value -> label map with
+        given data variables.
         
         """
         if labname is None: labname = ""
@@ -2413,28 +2563,49 @@ class Dta():
         # assume there are actual changes
         self._changed = True
         
-    def _label_language_list(self, nlangs, langs, curr_lang):
+    def _label_language_list_smcl(self, nlangs, langs, curr_lang):
         """helper function for label_language()"""
         print("{txt}{title:Language for variable and value labels}\n")
         
         if nlangs <= 1:
-            print("    {txt}In this dataset, value and variable labels have" + 
-                  " been defined in only one language:  " + 
-                  "{{res}}{}\n".format(curr_lang))
+            print("    {txt}In this dataset, value and variable labels have", 
+                  "been defined in only one language: {res}",
+                  curr_lang)
         else:
             print("    {txt}Available languages:")
             for lang in langs:
                 print("            {res}" + lang)
-            print("")
-            print("    {txt}Currently set is:" + 
-                "{{col 37}}{{res}}label_language(\"{}\")\n".format(curr_lang))
-            print("    {txt}To select different language:" + 
-                  "{col 37}{res}<self>.label_language(<name>)\n")
+            print("\n    {txt}Currently set is:{col 37}{res}",
+                  "label_language(\"{}\")\n".format(curr_lang),
+                  "\n    {txt}To select different language:{col 37}{res}", 
+                  "<self>.label_language(<name>)")
         
-        print("    {txt}To create new language:{col 37}{res}" + 
-              "<self>.label_language(<name>, new=True)")
-        print("    {txt}To rename current language:{col 37}" + 
-              "{res}<self>.label_language(<name>, rename=True)")
+        print("\n    {txt}To create new language:{col 37}{res}",
+              "<self>.label_language(<name>, new=True)",
+              "\n    {txt}To rename current language:{col 37}{res}",
+              "<self>.label_language(<name>, rename=True)")
+        
+    def _label_language_list_nosmcl(self, nlangs, langs, curr_lang):
+        """helper function for label_language()"""
+        print("Language for variable and value labels\n")
+        
+        if nlangs <= 1:
+            print("    In this dataset, value and variable labels",
+                  "have been defined in only one language: ",
+                  curr_lang)
+        else:
+            print("    Available languages:")
+            for lang in langs:
+                print("            {}".format(lang))
+            print("\n    Currently set is:              ",  
+                  "label_language(\"{}\")\n".format(curr_lang),
+                  "\n    To select different language:  ", 
+                  "<self>.label_language(<name>)")
+        
+        print("\n    To create new language:        ",
+              "<self>.label_language(<name>, new=True)",
+              "\n    To rename current language:    ",
+              "<self>.label_language(<name>, rename=True)")
         
     def _label_language_delete(self, languagename, langs,
                                curr_lang, name_exists):
@@ -2624,7 +2795,9 @@ class Dta():
             # Safety in case of malformed chrdict. 
             # Also guards against empty lang list.
             if curr_lang not in langs or not has_lang_c:
-                print("{err}odd values in characteristics; trying to recover")
+                if IN_STATA:
+                    print("{err}", end="")
+                print("odd values in characteristics; trying to recover")
                 
                 # make sure curr_lang is not one of the stored languages
                 
@@ -2653,16 +2826,57 @@ class Dta():
         
     def label_language(self, languagename=None, 
                       new=False, copy=False, rename=False, delete=False):
-        """Provides functionality for creating, modifying, or deleting 
-            alternate versions of the data, variable, and value labels.
-        Use rename=True to set or change name of current label language.
-        Use new=True to create new language and set that language as 
-            current (labels are set to empty).
-        Use new=True and copy=True to copy current labels as new 
-            language.
-        Use delete=True to delete given language labels.
+        """Various functionality for manipulating groups of variable
+        and data labels.
+        
+        Users may, for example, make the same data and variable labels
+        multiple times in different languages, with each language a
+        separate group. This function creates, deletes, renames and 
+        swaps groups.
+        
+        Parameters
+        ----------
+        languagename : str, optional
+            Name of label language/group.
+            Required if using any of the other parameters.
+            If used without other parameters, the action is to
+            set specified language/group as "current".
+        new : bool (or coercible to bool), optional
+            Used to create new language and set as "current".
+            New labels are empty when `copy` is not specified.
+            Default value is False.
+        copy : bool (or coercible to bool), optional
+            Used to copy the "current" group of labels.
+            Cannot be used without setting `new'=True.
+            Hence, also sets the copy as "current".
+            Default value is False.
+        rename : bool (or coercible to bool), optional
+            Rename current group of labels, or set the name of the 
+            current set, if no name has been applied.
+            Default value is False.
+        delete : bool (or coercible to bool), optional
+            Delete given label language/group. Not allowed if there
+            is only one defined label language/group.
+            Default value is False.
+            
+        Note
+        ----
+        If no parameters are specified, the action is to list all label
+        languages/groups. Of `new`, `copy`, `rename`, and `delete`, only
+        `new` and `copy` may be used together. A `languagename` is
+        restricted to 24 characters and will be truncated if necessary.
+        
+        Returns
+        -------
+        None
+        
+        Side effects
+        ------------
+        Creates, deletes, renames, or swaps label languages/groups.
         
         """
+        in_stata = IN_STATA
+        
         curr_lang, langs, nlangs = self._get_language_info()
         
         noptions = sum((new, copy, rename, delete))
@@ -2672,7 +2886,10 @@ class Dta():
             if noptions != 0:
                 msg = "options cannot be used without language name"
                 raise ValueError(msg)
-            self._label_language_list(nlangs, langs, curr_lang)
+            if in_stata:
+                self._label_language_list_smcl(nlangs, langs, curr_lang)
+            else:
+                self._label_language_list_nosmcl(nlangs, langs, curr_lang)
             return
         
         # more error checking
@@ -2686,7 +2903,9 @@ class Dta():
         if not isinstance(languagename, str):
             raise TypeError("given language name must be str")
         if len(languagename) > 24:
-            print("{err}shortening language name to 24 characters")
+            if in_stata:
+                print("{err}", end="")
+            print("shortening language name to 24 characters")
             languagename = languagename[:24]
         
         name_exists = languagename in langs
@@ -2697,7 +2916,9 @@ class Dta():
                 msg = "language {} not defined".format(languagename)
                 raise ValueError(msg)
             if languagename == curr_lang:
-                print("{{txt}}({} already current language)".format(curr_lang))
+                if in_stata:
+                    print("{txt}", end="")
+                print("({} already current language)".format(curr_lang))
             else:
                 self._label_language_swap(languagename, curr_lang)
             return
@@ -2712,13 +2933,13 @@ class Dta():
                        "it may not be deleted")
                 raise ValueError(msg.format(languagename))
             self._label_language_delete(languagename, langs,
-                                      curr_lang, name_exists)
+                                        curr_lang, name_exists)
             return
         
         # From this point, rename == True or new == True.
         # Both require given languagename not already exist.
         if name_exists:
-            raise ValueError("language {} already esists".format(languagename))
+            raise ValueError("language {} already exists".format(languagename))
         
         # rename current language
         if rename:
@@ -2740,8 +2961,9 @@ class Dta():
         self._put_labels_in_chr(languagename, langs, curr_lang)
         if copy:
             # use current labels
-            msg = "{{txt}}(language {} now current language)"
-            print(msg.format(languagename))
+            if in_stata:
+                print("{txt}", end="")
+            print("(language {} now current language)".format(languagename))
         else:
             # empty current labels
             nvar = self._nvar
