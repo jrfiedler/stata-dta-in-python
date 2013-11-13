@@ -48,6 +48,118 @@ class Dta():
     
     """
     def __init__(self, *args, **kwargs):
+        """Initialize Dta object.
+        
+        Dta objects can be created 
+        - from file, 
+        - from an iterable of values (as in a list of lists, with
+        one sub-list per observation), 
+        - by subscripting an existing Dta (usually done with
+        subscripting syntax like data[::2, (0,4,8)] ), or
+        - by converting one sub-type of Dta to another (for example, 
+        converting from version 115 to 117 by converting a Dta115 
+        instance to a Dta117 instance).
+        
+        
+        New from file
+        =============
+        Parameters
+        ----------
+        address : str
+            Address of dta file, including file name and ".dta".
+            
+        Example
+        -------
+        >>> Dta115("path/to/some_dta_v115.dta")
+        >>> Dta117("path/to/some_dta_v117.dta")
+        # if uncertain of version, open_dta() can open 114, 115, or 117
+        >>> open_dta("recent_version.dta")
+        
+        Side effects
+        ------------
+        If the data set has a label, the label will be printed.
+        
+        
+        New from iterable
+        =================
+        Parameters
+        ----------
+        varvals : iterable
+            Values to 
+        compress : bool (or coercible to bool), optional
+            This sets the default type to attempt to assign to a
+            data variable as byte if compress=True, or float if 
+            compress=False. Default type is overridden as necessary.
+            Using compress=True can result in smaller files.
+            Default value is True.
+        single_row : bool (or coercible to bool), optional
+            The code tries to be helpful with inputs. The correct way to
+            specify a single row data set is with a non-string iterable
+            within another iterable, as in ((0,1,2,3)) or [[0,1,2,3]].
+            With single_row=True, a single row can be specified as,
+            for example, just (0,1,2,3) or [0,1,2,3].
+            (Don't combine ((0,1,2,3)) with single_row=True.)
+            Default value is False.
+            
+        Example
+        -------
+        >>> v = [[0.0, 0.1, 0.2],[1.0, 1.1, 1.2],[2.0,2.1,2.2]]
+        >>> Dta117(v)
+                
+        
+        Subscripting a Dta instance (usually used indirectly)
+        =====================================================
+        Parameters
+        ----------
+        old_dta : Dta instance
+        sel_rows : iterable of int, optional
+            The rows (observations) to be selected from the `old_dta`.
+            Defaults to all observations.
+        sel_cols : iterable of int, optional
+            The cols (data variables) to be selected from the `old_dta`.
+            Defaults to all variables.
+            
+        Example
+        -------
+        # take even-numbered observations and variables 0, 4, 8
+        >>> smaller_dta = some_dta[::2, (0,4,8)]
+            
+        
+        Converting a Dta instance
+        =========================
+        Parameters
+        ----------
+        old_dta : Dta instance
+        sel_rows : iterable of int, optional
+            The rows (observations) to be selected from the `old_dta`.
+            Defaults to all observations.
+        sel_cols : iterable of int, optional
+            The cols (data variables) to be selected from the `old_dta`.
+            Defaults to all variables.
+        
+        Example
+        -------
+        # open a version 115 file
+        >>> dta115 = open_dta("some_dta_v115.dta")
+        # convert to version 117
+        >>> dta117 = Dta117(dta115)
+        
+        Side effects
+        ------------
+        Data may be changed or variables dropped if converting from a 
+        more permissive format to a more restrictive one.
+        
+        
+        Returns
+        =======
+        All examples above return an instance of a Dta sub-class.
+        
+        
+        Side effects
+        ============
+        Initializes Dta object.
+        
+        """
         nargs = len(args) + len(kwargs)
         if nargs == 0:
             raise TypeError("one or more arguments required (0 given)")
@@ -151,8 +263,8 @@ class Dta():
             Address of file to save to.
             Optional if Dta object was created from file
             or has been saved already, otherwise required.
-        replace : bool
-            Optional, default value is False.
+        replace : bool, optional
+            Default value is False.
             True is required to write over existing file.
         
         Returns
