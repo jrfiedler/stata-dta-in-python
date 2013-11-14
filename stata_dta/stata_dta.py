@@ -19,6 +19,12 @@ except ImportError:
     IN_STATA = False
 
 
+__version__ = '0.1.0'
+
+__all__ = ['Dta', 'Dta115', 'Dta117', 
+           'display_diff', 'open_dta']
+    
+
 VALID_NAME_RE = re.compile(r'^[_a-zA-Z][_a-zA-Z0-9]{0,31}$')
 RESERVED = frozenset(('_all', '_b', 'byte', '_coef', '_cons', 
             'double', 'float', 'if', 'in', 'int', 'long', '_n', '_N',
@@ -40,6 +46,10 @@ TIME_FMT_RE = re.compile(r'^%(-)?t(c|C|d|w|m|q|h|y|g)(' + date_details + ')*$')
 TB_FMT_RE = re.compile(r'^%(-)?tb([^:]*)(:(' + date_details + ')*)?$')
 MONTH_ABBREV = {1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May', 6: 'Jun', 
                 7: 'Jul', 8: 'Aug', 9: 'Sep', 10: 'Oct', 11: 'Nov', 12: 'Dec'}
+
+# exception to raise when Dta file is mis-formatted
+class DtaParseError(Exception):
+    pass
 
 
 class Dta():
@@ -237,9 +247,8 @@ class Dta():
         else:
             try:
                 self._file_to_Dta117(address)
-            except AssertionError:
-                msg = "dta file seems to be format 117, but does not conform"
-                raise ValueError(msg) from None
+            except DtaParseError as e:
+                raise DtaParseError(e.args[0] if e.args else '') from None
             if type(self) != Dta117:
                 print("file format is {}, converting to 115".format(version))
                 self._convert_dta(Dta117)
@@ -3322,8 +3331,26 @@ class Dta():
         return c
         
     def __eq__(self, other):
-        """Compare two datasets for equality.
-        Does not test data label, time stamp, or filename.
+        """Compare two datasets for equality. 
+        
+        Does not test data label, time stamp, or file name.
+        
+        Tests
+        - number of data variables,
+        - number of observations,
+        - dta version,
+        - data types,
+        - data variable names,
+        - 'sorted by' information,
+        - display formats,
+        - value -> label mappings applied to data variables,
+        - data variable labels,
+        - defined characteristics,
+        - data values, and
+        - defined value -> label mappings.
+        
+        If wanting information about differences between two
+        Dta objects, use the function `stata_dta.display_diff`.
         
         """
         # check that is Dta and is same version
@@ -3333,7 +3360,7 @@ class Dta():
         if not self._nvar == other._nvar: return False
         if not self._nobs == other._nobs: return False
         if not self._ds_format == other._ds_format: return False
-        #if not self._data_label == other.data_label: return False # keep ?
+        #if not self._data_label == other._data_label: return False # keep ?
         
         #descriptors
         if not self._typlist == other._typlist: return False
@@ -3704,103 +3731,113 @@ class Dta():
             return value
         
         with open(address, 'rb') as sfile:
-            assert get_str(11) == "<stata_dta>"
+            if get_str(11) != "<stata_dta>":
+                raise DtaParseError("expected '<stata_dta>'")
         
             # header info
-            assert get_str(8) == "<header>"
+            if get_str(8) != "<header>":
+                raise DtaParseError("expected '<header>'")
             
-            assert get_str(9) == "<release>"
+            if get_str(9) != "<release>": 
+                raise DtaParseError("expected '<release>'")
             self._ds_format = int(get_str(3))
-            assert self._ds_format == 117
-            assert get_str(10) == "</release>"
+            if self._ds_format != 117: 
+                raise DtaParseError("expected release 117")
+            if get_str(10) != "</release>": 
+                raise DtaParseError("expected '</release>'")
             
-            assert get_str(11) == "<byteorder>"
+            if get_str(11) != "<byteorder>": 
+                raise DtaParseError("expected '<byteorder>'")
             self._byteorder = byteorder = ('>' if get_str(3) == "MSF" else '<')
-            assert get_str(12) == "</byteorder>"
+            if get_str(12) != "</byteorder>": 
+                raise DtaParseError("expected '</byteorder>'")
             
-            assert get_str(3) == "<K>"
+            if get_str(3) != "<K>": 
+                raise DtaParseError("expected '<K>'")
             self._nvar = nvar = unpack(byteorder + 'H', sfile.read(2))[0]
-            assert get_str(4) == "</K>"
+            if get_str(4) != "</K>": 
+                raise DtaParseError("expected '</K>'")
             
-            assert get_str(3) == "<N>"
+            if get_str(3) != "<N>": 
+                raise DtaParseError("expected '<N>'")
             self._nobs = nobs = unpack(byteorder + 'I', sfile.read(4))[0]
-            assert get_str(4) == "</N>"
+            if get_str(4) != "</N>": 
+                raise DtaParseError("expected '</N>'")
             
-            assert get_str(7) == "<label>"
+            if get_str(7) != "<label>": 
+                raise DtaParseError("expected '<label>'")
             label_length = unpack(byteorder + 'B', sfile.read(1))[0]
             self._data_label = get_str(label_length)
-            assert get_str(8) == "</label>"
+            if get_str(8) != "</label>": 
+                raise DtaParseError("expected '</label>'")
             
-            assert get_str(11) == "<timestamp>"
+            if get_str(11) != "<timestamp>":
+                raise DtaParseError("expected '<timestamp>'")
             stamp_length = unpack(byteorder + 'B', sfile.read(1))[0]
             self._time_stamp = get_str(stamp_length)
             # -help dta- seems to indicate there's an optional binary zero here
-            mystery_byte = unpack(byteorder + 'B', sfile.read(1))[0]
-            assert (
-                (mystery_byte == b'\0' and get_str(12) == "</timestamp>") or
-                (mystery_byte == 60 and get_str(11) == "/timestamp>"))
+            next = unpack(byteorder + 'B', sfile.read(1))[0]
+            if (not (next == b'\0' and get_str(12) == "</timestamp>") and
+                    not (next == 60 and get_str(11) == "/timestamp>")):
+                raise DtaParseError("'</timestamp>'")
             # 60 is int of '<' with iso-8859-1 encoding
             
-            assert get_str(9) == "</header>"
+            if get_str(9) != "</header>": 
+                raise DtaParseError("expected '</header>'")
             
             # map
-            assert get_str(5) == "<map>"
-            file_beg_loc = unpack(byteorder + 'Q', sfile.read(8))[0]
-            map_loc = unpack(byteorder + 'Q', sfile.read(8))[0]
-            vartypes_loc = unpack(byteorder + 'Q', sfile.read(8))[0]
-            varnames_loc = unpack(byteorder + 'Q', sfile.read(8))[0]
-            sortlist_loc = unpack(byteorder + 'Q', sfile.read(8))[0]
-            formats_loc = unpack(byteorder + 'Q', sfile.read(8))[0]
-            value_labnames_loc = unpack(byteorder + 'Q', sfile.read(8))[0]
-            variable_labs_loc = unpack(byteorder + 'Q', sfile.read(8))[0]
-            char_loc = unpack(byteorder + 'Q', sfile.read(8))[0]
-            data_loc = unpack(byteorder + 'Q', sfile.read(8))[0]
-            strls_loc = unpack(byteorder + 'Q', sfile.read(8))[0]
-            value_labs_loc = unpack(byteorder + 'Q', sfile.read(8))[0]
-            end_tag_loc = unpack(byteorder + 'Q', sfile.read(8))[0]
-            file_end_loc = unpack(byteorder + 'Q', sfile.read(8))[0]
-            assert get_str(6) == "</map>"
+            if get_str(5) != "<map>": 
+                raise DtaParseError("expected '<map>'")
+            locs = unpack(byteorder + 'Q'*14, sfile.read(14 * 8))
+            if get_str(6) != "</map>": 
+                raise DtaParseError("expected '</map>'")
             
             # variable types
-            assert sfile.tell() == vartypes_loc
-            assert get_str(16) == "<variable_types>"
+            if sfile.tell() != locs[2] or get_str(16) != "<variable_types>":
+                raise DtaParseError("expected '<variable_types>'")
             self._typlist = [unpack(byteorder + 'H', sfile.read(2))[0] 
                              for i in range(nvar)]
-            assert get_str(17) == "</variable_types>"
+            if get_str(17) != "</variable_types>": 
+                raise DtaParseError("expected '</variable_types>'")
             
             # varnames
-            assert sfile.tell() == varnames_loc
-            assert get_str(10) == "<varnames>"
+            if sfile.tell() != locs[3] or get_str(10) != "<varnames>":
+                raise DtaParseError("expected '<varnames>'")
             self._varlist = [get_term_str(33) for i in range(nvar)]
-            assert get_str(11) == "</varnames>"
+            if get_str(11) != "</varnames>": 
+                raise DtaParseError("expected '</varnames>'")
             
             # sortlist
-            assert sfile.tell() == sortlist_loc
-            assert get_str(10) == "<sortlist>"
+            if sfile.tell() != locs[4] or get_str(10) != "<sortlist>":
+                raise DtaParseError("expected '<sortlist>'")
             self._srtlist = self._get_srtlist(sfile)
-            assert get_str(11) == "</sortlist>"
+            if get_str(11) != "</sortlist>": 
+                raise DtaParseError("expected '</sortlist>'")
             
             # formats
-            assert sfile.tell() == formats_loc
-            assert get_str(9) == "<formats>"
+            if sfile.tell() != locs[5] or get_str(9) != "<formats>":
+                raise DtaParseError("expected '<formats>'")
             self._fmtlist = [get_term_str(49) for i in range(nvar)]
-            assert get_str(10) == "</formats>"
+            if get_str(10) != "</formats>": 
+                raise DtaParseError("expected '</formats>'")
             
             # value label names
-            assert sfile.tell() == value_labnames_loc
-            assert get_str(19) == "<value_label_names>"
+            if sfile.tell() != locs[6] or get_str(19) != "<value_label_names>":
+                raise DtaParseError("expected '<value_label_names>'")
             self._lbllist = [get_term_str(33) for i in range(nvar)]
-            assert get_str(20) == "</value_label_names>"
+            if get_str(20) != "</value_label_names>": 
+                raise DtaParseError("expected '</value_label_names>'")
             
             # variable labels
-            assert sfile.tell() == variable_labs_loc
-            assert get_str(17) == "<variable_labels>"
+            if sfile.tell() != locs[7] or get_str(17) != "<variable_labels>":
+                raise DtaParseError("expected '<variable_labels>'")
             self._vlblist = [get_term_str(81) for i in range(nvar)]
-            assert get_str(18) == "</variable_labels>"
+            if get_str(18) != "</variable_labels>": 
+                raise DtaParseError("expected '</variable_labels>'")
             
             # characteristics
-            assert sfile.tell() == char_loc
-            assert get_str(17) == "<characteristics>"
+            if sfile.tell() != locs[8] or get_str(17) != "<characteristics>":
+                raise DtaParseError("expected '<characteristics>'")
             chrdict = {}
             next_four = get_term_str(4)
             while next_four == "<ch>":
@@ -3812,14 +3849,16 @@ class Dta():
                 if varname not in chrdict:
                     chrdict[varname] = {}
                 chrdict[varname][charname] = charstring
-                assert get_str(5) == "</ch>"
+                if get_str(5) != "</ch>": 
+                    raise DtaParseError("expected '</ch>'")
                 next_four = get_term_str(4)
             self._chrdict = chrdict
-            assert next_four == "</ch" and get_str(14) == "aracteristics>"
+            if next_four != "</ch" or get_str(14) != "aracteristics>":
+                raise DtaParseError("expected '</characteristics>'")
             
             # data
-            assert sfile.tell() == data_loc
-            assert get_str(6) == "<data>"
+            if sfile.tell() != locs[9] or get_str(6) != "<data>":
+                raise DtaParseError("expected '<data>'")
             varvals = []
             data_append = varvals.append
             typlist = self._typlist
@@ -3841,11 +3880,12 @@ class Dta():
                     append(new_val)
                 data_append(new_row)
             self._varvals = varvals
-            assert get_str(7) == "</data>"
+            if get_str(7) != "</data>": 
+                raise DtaParseError("expected '</data>'")
             
             # strls
-            assert sfile.tell() == strls_loc
-            assert get_str(7) == "<strls>"
+            if sfile.tell() != locs[10] or get_str(7) != "<strls>": 
+                raise DtaParseError("expected '<strls>'")
             strls = {(0,0): ""}
             next_three = get_str(3)
             while next_three == "GSO":
@@ -3860,7 +3900,8 @@ class Dta():
                     new_str = sfile.read(str_len)
                 strls.update({vo: new_str})
                 next_three = get_str(3)
-            assert next_three == "</s" and get_str(5) == "trls>"
+            if next_three != "</s" or get_str(5) != "trls>":
+                raise DtaParseError("expected '</strls>'")
                         
             # put strls in data
             for st_type, var_num in zip(typlist, range(nvar)):
@@ -3873,8 +3914,8 @@ class Dta():
                         varvals[obs_num][var_num] = strls[(v,o)]
             
             # value labels
-            assert sfile.tell() == value_labs_loc
-            assert get_str(14) == "<value_labels>"
+            if sfile.tell() != locs[11] or get_str(14) != "<value_labels>":
+                raise DtaParseError("expected '<value_labels>'")
             value_labels = {}
             parse_value_label_table = self._parse_value_label_table
             next_five = get_str(5)
@@ -3884,17 +3925,21 @@ class Dta():
                 sfile.seek(3, 1) # padding
                 label_table = parse_value_label_table(sfile)
                 value_labels[label_name] = label_table
-                assert get_str(6) == "</lbl>"
+                if get_str(6) != "</lbl>": 
+                    raise DtaParseError("expected '</lbl>'")
                 next_five = get_str(5)
             self._vallabs = value_labels
-            assert next_five == "</val" and get_str(10) == "ue_labels>"
+            if next_five != "</val" or get_str(10) != "ue_labels>":
+                raise DtaParseError("expected '</value_labels>'")
+                
             
             # end tag
-            assert sfile.tell() == end_tag_loc
-            assert get_str(12) == "</stata_dta>"
+            if sfile.tell() != locs[12] or get_str(12) != "</stata_dta>":
+                raise DtaParseError("expected '</stata_dta>'")
             
             # end of file
-            assert sfile.tell() == file_end_loc
+            if sfile.tell() != locs[13]:
+                raise DtaParseError("expected end of file")
         
     def _isstrvar(self, index):
         raise NotImplementedError
@@ -5680,12 +5725,21 @@ def display_diff(dta1, dta2, all_data=False):
     if not isinstance(dta1, Dta) or not isinstance(dta2, Dta):
         raise TypeError("objects to be compared must be Dta")
     
-    # Python class types, partly as a double-check on class __init__ methods
-    if not type(dta1) == type(dta2):
+    typlist_converters = {
+        'Dta115': {
+            'Dta117': lambda i: i if i <= 244 else 65530 + (251 - i)
+        }
+    }
+    
+    # Python class types <-> dta version
+    # ----------------------------------
+    dta1_type, dta2_type = type(dta1).__name__, type(dta2).__name__
+    if not dta1_type == dta2_type:
         print("    class types differ:")
-        print("        {} vs {}".format(type(dta1), type(dta2)))
+        print("        {} vs {}".format(dta1_type, dta2_type))
     
     # data set descriptors
+    # --------------------
     if not dta1._ds_format == dta2._ds_format:
         print("    formats differ:")
         print("        {} vs {}".format(dta1._ds_format, dta2._ds_format))
@@ -5695,6 +5749,7 @@ def display_diff(dta1, dta2, all_data=False):
         print("        {} vs {}".format(dta1._data_label, dta2._data_label))
     
     # time stamp
+    # ----------
     stamp1 = dta1._time_stamp.split()
     stamp2 = dta2._time_stamp.split()
     stamp1[0] = int(stamp1[0]) #day
@@ -5708,6 +5763,7 @@ def display_diff(dta1, dta2, all_data=False):
         print("        {} vs {}".format(dta1._time_stamp, dta2._time_stamp))
     
     # number of variables and observations
+    # ------------------------------------
     if not dta1._nvar == dta2._nvar:
         print("    # of vars differs:")
         print("        {} vs {}".format(dta1._nvar, dta2._nvar))
@@ -5722,38 +5778,57 @@ def display_diff(dta1, dta2, all_data=False):
     nobs = min(dta1._nobs, dta2._nobs)
     
     # descriptors
-    diff = [i for i in range(nvar) if dta1._typlist[i] != dta2._typlist[i]]
+    # -----------
+    
+    # typlist
+    # If dta versions are the same, can make direct comparison. If versions
+    # are different, a direct comparison doesn't mean much if data types
+    # are encoded differently, so convert one before comparing.
+    if dta1_type == dta2_type:
+        diff = [i for i in range(nvar) if dta1._typlist[i] != dta2._typlist[i]]
+    else:
+        s = sorted(((dta1_type, dta1), (dta2_type, dta2)))
+        (older_type, older_dta), (newer_type, newer_dta) = s
+        converter = typlist_converters[older_type][newer_type]
+        diff = [i for i in range(nvar) 
+                if converter(older_dta._typlist[i]) != newer_dta._typlist[i]]
     if diff != []:
         print("    Stata data types differ in {} places".format(len(diff)))
         print("        first difference in position {}".format(diff[0]))
-        
+    
+    # varlist
     diff = [i for i in range(nvar) if dta1._varlist[i] != dta2._varlist[i]]
     if diff != []:
         print("    variable names differ in {} places".format(len(diff)))
         print("        first difference in position {}".format(diff[0]))
         
+    # srtlist
     diff = [i for i in range(nvar) if dta1._srtlist[i] != dta2._srtlist[i]]
     if diff != []:
         print("    sort lists differ in {} places".format(len(diff)))
         print("        first difference in position {}".format(diff[0]))
-        
+    
+    # fmtlist
     diff = [i for i in range(nvar) if dta1._fmtlist[i] != dta2._fmtlist[i]]
     if diff != []:
         print("    display formats differ in {} places".format(len(diff)))
         print("        first difference in position {}".format(diff[0]))
         
+    # lbllist
     diff = [i for i in range(nvar) if dta1._lbllist[i] != dta2._lbllist[i]]
     if diff != []:
         msg = "    attached value labels differ in {} places".format(len(diff))
         print(msg)
         print("        first difference in position {}".format(diff[0]))
         
+    # vlblist
     diff = [i for i in range(nvar) if dta1._vlblist[i] != dta2._vlblist[i]]
     if diff != []:
         print("    variable labels differ in {} places".format(len(diff)))
         print("        first difference in position {}".format(diff[0]))
       
     # characteristics
+    # ---------------
     keys1 = set(dta1._chrdict.keys())
     keys2 = set(dta2._chrdict.keys())
     diff = keys1 - keys2
@@ -5772,17 +5847,18 @@ def display_diff(dta1, dta2, all_data=False):
         print("    charataristic keys with different value:")
         print("       ", str(diff))
         
-    # value labels
+    # defined value labels
+    # --------------------
     keys1 = set(dta1._vallabs.keys())
     keys2 = set(dta2._vallabs.keys())
     diff = keys1 - keys2
     if diff != set():
-        print("    value labels in #1 but not in #2:")
+        print("    value labels defined in #1 but not in #2:")
         print("       ", str(diff))
         
     diff = keys2 - keys1
     if diff != set():
-        print("    value labels in #2 but not in #1:")
+        print("    value labels defined in #2 but not in #1:")
         print("       ", str(diff))
         
     diff = [k for k in keys1.intersection(keys2)
@@ -5792,6 +5868,7 @@ def display_diff(dta1, dta2, all_data=False):
         print("       ", str(diff))
     
     # data values
+    # -----------
     if all_data:
         diff = sum([0] + [1 for i in range(nobs) for j in range(nvar)
                     if dta1._varvals[i][j] != dta2._varvals[i][j]])
@@ -5807,7 +5884,8 @@ def display_diff(dta1, dta2, all_data=False):
             else:
                 continue  # executed if the loop ended normally (no break)
             break  # executed if 'continue' was skipped (break)
-            # trick from http://stackoverflow.com/questions/653509
+            # trick from http://stackoverflow.com/questions/653509 
+            # to exit from nested for loops
 
 
 def open_dta(address):
@@ -5826,11 +5904,9 @@ def open_dta(address):
         first_bytes = dta_file.read(11)
     ds_format = first_bytes[0]
     # If format is 117, then first_bytes[0] is "<", which gets unpacked as 60.
-    if ds_format == 114 or ds_format == 115: 
-        print("opening with Dta115")
+    if ds_format == 114 or ds_format == 115:
         return Dta115(address)
     elif first_bytes.decode('iso-8859-1') == "<stata_dta>":
-        print("opening with Dta117")
         return Dta117(address)
     else:
         print("only dta formats 117, 115, and 114 are supported")
