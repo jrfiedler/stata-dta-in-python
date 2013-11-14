@@ -3829,7 +3829,11 @@ class Dta():
                 raise DtaParseError("expected '</value_label_names>'")
             
             # variable labels
-            if sfile.tell() != locs[7] or get_str(17) != "<variable_labels>":
+            # Before the 02jul2013 update, Stata put a zero in location
+            # map for "<variable_labels>". Allow zero for files created
+            # before that update.
+            if (not (locs[7] == 0 or sfile.tell() == locs[7]) or 
+                    get_str(17) != "<variable_labels>"):
                 raise DtaParseError("expected '<variable_labels>'")
             self._vlblist = [get_term_str(81) for i in range(nvar)]
             if get_str(18) != "</variable_labels>": 
