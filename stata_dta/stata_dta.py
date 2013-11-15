@@ -1667,7 +1667,7 @@ class Dta():
         else:
             list_format = self._list_format_nostata
             fmts = self._translate_fmts()  # formats plus other info
-            widths = [info[2] for info in fmts]
+            widths = [fmts[i][2] for i in indexes]
         
         obs, separator = self._check_list_args(**kwargs)
         
