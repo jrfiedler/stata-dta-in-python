@@ -9,7 +9,7 @@ import re
 import copy
 import sys
 
-from stata_dta.stata_missing import (get_missing, MissingValue,
+from .stata_missing import (get_missing, MissingValue,
                                      MISSING, MISSING_VALS)
 
 try:
@@ -223,14 +223,14 @@ class Dta():
                          for i in sel_rows]
         
         # value labels
-        self._vallabs = old_dta._vallabs.copy()
+        self._vallabs = copy.deepcopy(old_dta._vallabs)  # copy
         
         # set changed to True, since new dataset has not been saved
         self._changed = True
         
         # convert type if old_dta was a different version of .dta
-        old_type = type(old_dta)
-        if not type(self) == old_type:
+        old_type = old_dta.__class__
+        if not isinstance(self, old_type):
             self._convert_dta(old_type)
     
     def _new_from_file(self, address):
@@ -241,15 +241,15 @@ class Dta():
         
         if version in (114, 115):
             self._file_to_Dta115(address)
-            if type(self) != Dta115:
+            if not isinstance(self, Dta115):
                 print("file format is {}, converting to 117".format(version))
                 self._convert_dta(Dta115)
         else:
-            try:
-                self._file_to_Dta117(address)
-            except DtaParseError as e:
-                raise DtaParseError(e.args[0] if e.args else '') from None
-            if type(self) != Dta117:
+            #try:
+            self._file_to_Dta117(address)
+            #except DtaParseError as e:
+            #    raise DtaParseError(e.args[0] if e.args else '') from None
+            if not isinstance(self, Dta117):
                 print("file format is {}, converting to 115".format(version))
                 self._convert_dta(Dta117)
                 
@@ -392,7 +392,7 @@ class Dta():
                 raise ValueError(
                     "\"_all\" may not be combined with other names")
             all_specified = True
-            all_names = (['_dta'] if evars else []) + self._varlist.copy()
+            all_names = (['_dta'] if evars else []) + list(self._varlist)
             nnames = len(all_names)
             
         # check that more than 0 names specified if empty_ok==False, and
@@ -2340,8 +2340,9 @@ class Dta():
             raise TypeError("data label should be a string")
         if len(label) > 80:
             if IN_STATA:
-                print("{err}", end="")
-            print("truncating label to 80 characters")
+                print("{err}truncating label to 80 characters")
+            else:
+                print("truncating label to 80 characters")
             label = label[:80]
         if self._data_label == label:
             return
@@ -2917,8 +2918,12 @@ class Dta():
             # Also guards against empty lang list.
             if curr_lang not in langs or not has_lang_c:
                 if IN_STATA:
-                    print("{err}", end="")
-                print("odd values in characteristics; trying to recover")
+                    print("".join(
+                        ("{err}",
+                        "odd values in characteristics; ",
+                        "trying to recover")))
+                else:
+                    print("odd values in characteristics; trying to recover")
                 
                 # make sure curr_lang is not one of the stored languages
                 
@@ -3025,8 +3030,9 @@ class Dta():
             raise TypeError("given language name must be str")
         if len(languagename) > 24:
             if in_stata:
-                print("{err}", end="")
-            print("shortening language name to 24 characters")
+                print("{err}shortening language name to 24 characters")
+            else:
+                print("shortening language name to 24 characters")
             languagename = languagename[:24]
         
         name_exists = languagename in langs
@@ -3038,8 +3044,11 @@ class Dta():
                 raise ValueError(msg)
             if languagename == curr_lang:
                 if in_stata:
-                    print("{txt}", end="")
-                print("({} already current language)".format(curr_lang))
+                    print(
+                        ("{txt}",
+                        "({} already current language)".format(curr_lang)))
+                else:
+                    print("({} already current language)".format(curr_lang))
             else:
                 self._label_language_swap(languagename, curr_lang)
             return
@@ -3082,9 +3091,9 @@ class Dta():
         self._put_labels_in_chr(languagename, langs, curr_lang)
         if copy:
             # use current labels
-            if in_stata:
-                print("{txt}", end="")
-            print("(language {} now current language)".format(languagename))
+            msg = "(language {} now current language)".format(languagename)
+            smcl = "{txt}" if in_stata else ""
+            print("".join((smcl, msg)))
         else:
             # empty current labels
             nvar = self._nvar
@@ -3167,7 +3176,8 @@ class Dta():
         sel_cols = (self._convert_col_index(index[1]) 
                     if len(index) == 2 else None)
         sel_cols = self._check_index(self._nvar, sel_cols)
-        return type(self)(self, sel_rows, sel_cols) # call instance constructor
+        # call instance constructor
+        return self.__class__(self, sel_rows, sel_cols)
         
     def _standardize_input(self, value):
         """helper for functions like __setitem__ 
@@ -3326,8 +3336,8 @@ class Dta():
         Dta instance
         
         """
-        c = type(self)(self) # using self's constructor on self
-        c._srtlist = self._srtlist.copy() # srtlist is not copied in __init__
+        c = self.__class__(self) # using self's constructor on self
+        c._srtlist = list(self._srtlist)  # copy, srtlist not copied in init
         return c
         
     def __eq__(self, other):
@@ -3354,7 +3364,7 @@ class Dta():
         
         """
         # check that is Dta and is same version
-        if not type(self) == type(other): return False
+        if not self.__class__ == other.__class__: return False
         
         # pertinent header info
         if not self._nvar == other._nvar: return False
@@ -3557,14 +3567,15 @@ class Dta():
         with open(address, 'rb') as dta_file:
             first_bytes = dta_file.read(11)
         ds_format = first_bytes[0]
+        if isinstance(ds_format, str):  # happens in Python 2.7
+            ds_format = ord(ds_format)
         # If format is 117, then first_bytes[0] is "<", which == 60.
         if ds_format == 114 or ds_format == 115:
             return ds_format
         elif first_bytes.decode('iso-8859-1') == "<stata_dta>":
             return 117
         else:
-            msg = "{} seems to have an unsupported format".format(address)
-            raise ValueError(msg)
+            raise ValueError("file seems to have an unsupported format")
         
     def _get_srtlist(self, sfile):
         """helper function for reading dta files"""
@@ -4007,7 +4018,9 @@ class Dta115(Dta):
     def _convert_dta(self, old_type):
         """convert other Dta version to 115"""
         if old_type not in (Dta117,):
-            msg = "conversion from {} to Dta115 not supported".format(old_type)
+            msg = "".join(
+                ("conversion from {} ".format(old_type.__name__),
+                "to Dta115 not supported"))
             raise TypeError(msg)
         
         self._ds_format = 115
@@ -4140,7 +4153,7 @@ class Dta115(Dta):
                     elif (not isinstance(value, float) and 
                             not isinstance(value, int)):
                         msg = ("value {},{} has invalid type {}"
-                                ).format(i, k, type(value))
+                                ).format(i, k, value.__class__.__name__)
                         raise TypeError(msg)
                     elif (-1.7976931348623157e+308 > value or 
                             value > 8.988465674311579e+307):
@@ -4190,7 +4203,7 @@ class Dta115(Dta):
                     elif (not isinstance(value, float) and
                             not isinstance(value, int)):
                         msg = ("value {},{} has invalid type {}"
-                                ).format(i, k, type(value))
+                                ).format(i, k, value.__class__.__name__)
                         raise TypeError(msg)
                     elif (-1.7976931348623157e+308 > value or
                             value > 8.988465674311579e+307):
@@ -4357,8 +4370,8 @@ class Dta115(Dta):
                         values[i] = ''
                         alt_missing = True
                     elif not (isinstance(val, int) or isinstance(val, float)):
-                        msg = ("value in position " + 
-                               "{} has invalid type {}".format(i, type(val)))
+                        msg = ("value in position {} has invalid ".format(i) +
+                               "type {}".format(val.__class__.__name__))
                         raise TypeError(msg)
                     elif (-1.7976931348623157e+308 > val or
                             val > 8.988465674311579e+307):
@@ -4404,8 +4417,8 @@ class Dta115(Dta):
                     elif isinstance(val, MissingValue):
                         pass
                     elif not (isinstance(val, float) or isinstance(val, int)):
-                        msg = ("value in position " + 
-                               "{} has invalid type {}".format(i, type(val)))
+                        msg = ("value in position {} has invalid ".format(i) +
+                               "type {}".format(val.__class__.__name__))
                         raise TypeError(msg)
                     elif (-1.7976931348623157e+308 > val or
                             val > 8.988465674311579e+307):
@@ -4814,7 +4827,9 @@ class Dta117(Dta):
     def _convert_dta(self, old_type):
         """convert other Dta version to 117"""
         if old_type not in (Dta115,):
-            msg = "conversion from {} to Dta117 not supported".format(old_type)
+            msg = "".join(
+                ("conversion from {} ".format(old_type.__name__),
+                "to Dta117 not supported"))
             raise TypeError(msg)
         self._ds_format = 117
         self._typlist = [i if i <= 244 else 65530 + (251 - i) 
@@ -4886,7 +4901,7 @@ class Dta117(Dta):
                     elif (not isinstance(value, int) and
                             not isinstance(value, float)):
                         msg = ("value {},{} has invalid type {}"
-                                ).format(i, k, type(value))
+                                ).format(i, k, value.__class__.__name__)
                         raise TypeError(msg)
                     elif (-1.7976931348623157e+308 > value or
                             value > 8.988465674311579e+307):
@@ -4908,7 +4923,7 @@ class Dta117(Dta):
                     elif (not isinstance(value, float) and 
                             not isinstance(value, int)):
                         msg = ("value {},{} has invalid type {}"
-                                ).format(i, k, type(value))
+                                ).format(i, k, value.__class__.__name__)
                         raise TypeError(msg)
                     elif (-1.7976931348623157e+308 > value or
                             value > 8.988465674311579e+307):
@@ -4958,7 +4973,7 @@ class Dta117(Dta):
                     elif (not isinstance(value, float) and 
                             not isinstance(value, int)):
                         msg = ("value {},{} has invalid type {}"
-                                ).format(i, k, type(value))
+                                ).format(i, k, value.__class__.__name__)
                         raise TypeError(msg)
                     elif (-1.7976931348623157e+308 > value or
                             value > 8.988465674311579e+307):
@@ -5123,8 +5138,8 @@ class Dta117(Dta):
                         alt_missing = True
                     elif (not isinstance(val, int) and 
                             not isinstance(val, float)):
-                        msg = ("value in position " + 
-                               "{} has invalid type {}".format(i, type(val)))
+                        msg = ("value in position {} has invalid ".format(i) +
+                               "type {}".format(val.__class__.__name__))
                         raise TypeError(msg)
                     elif (-1.7976931348623157e+308 > val or
                             val > 8.988465674311579e+307):
@@ -5144,8 +5159,8 @@ class Dta117(Dta):
                         st_type = 32768
                     elif (not isinstance(val, int) and 
                             not isinstance(val, float)):
-                        msg = ("value in position " + 
-                               "{} has invalid type {}".format(i, type(val)))
+                        msg = ("value in position {} has invalid ".format(i) +
+                               "type {}".format(val.__class__.__name__))
                         raise TypeError(msg)
                     elif (-1.7976931348623157e+308 > val or
                             val > 8.988465674311579e+307):
@@ -5192,8 +5207,8 @@ class Dta117(Dta):
                         pass
                     elif (not isinstance(val, float) and 
                             not isinstance(val, int)):
-                        msg = ("value in position {} has invalid type {}"
-                                ).format(i, type(val))
+                        msg = ("value in position {} has invalid ".format(i) +
+                               "type {}".format(val.__class__.__name__))
                         raise TypeError(msg)
                     elif (-1.7976931348623157e+308 > val or
                             val > 8.988465674311579e+307):
@@ -5737,7 +5752,7 @@ def display_diff(dta1, dta2, all_data=False):
     
     # Python class types <-> dta version
     # ----------------------------------
-    dta1_type, dta2_type = type(dta1).__name__, type(dta2).__name__
+    dta1_type, dta2_type = dta1.__class__.__name__, dta2.__class__.__name__
     if not dta1_type == dta2_type:
         print("    class types differ:")
         print("        {} vs {}".format(dta1_type, dta2_type))
@@ -5882,8 +5897,9 @@ def display_diff(dta1, dta2, all_data=False):
         for i in range(nobs):
             for j in range(nvar):
                 if dta1._varvals[i][j] != dta2._varvals[i][j]:
-                    print("    data values differ\n        ", end="")
-                    print("first difference in position {},{}".format(i,j))
+                    print("".join(
+                        ("    data values differ\n        ",
+                        "first difference in position {},{}".format(i,j))))
                     break
             else:
                 continue  # executed if the loop ended normally (no break)
@@ -5907,6 +5923,8 @@ def open_dta(address):
     with open(address, 'rb') as dta_file:
         first_bytes = dta_file.read(11)
     ds_format = first_bytes[0]
+    if isinstance(ds_format, str):  # happens in Python 2.7
+        ds_format = ord(ds_format)
     # If format is 117, then first_bytes[0] is "<", which gets unpacked as 60.
     if ds_format == 114 or ds_format == 115:
         return Dta115(address)
