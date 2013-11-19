@@ -3147,6 +3147,9 @@ class Dta():
                 else:
                     msg = "column iterable should contain only int or str"
                     raise TypeError(msg)
+            if len(new_index) != len(set(new_index)):
+                msg = "columns cannot be repeated; use -clonevar- to copy"
+                raise ValueError(msg)
             return new_index
         if isinstance(index, slice):
             start, stop, step = index.start, index.stop, index.step
@@ -3395,17 +3398,16 @@ class Dta():
         return True
         
     def check(self, version=None):
-        """Determine whether saved data set conforms to limits of 
-        given Stata version. 
+        """Determine whether saved data set would conform to limits
+        of given *Stata* version. (Not .dta version.)
         
         See -help limits- in Stata for more info.
         
         Parameters
         ----------
         version : int, optional
-            Specify a version to check against.
-            Default is to check against version implied by instance
-            (e.g., version 115 if instance of Dta115)
+            Specify a Stata version to check against.
+            Default is to check against Stata version 13.
         
         Returns
         -------
@@ -4229,12 +4231,13 @@ class Dta115(Dta):
                             # This should maybe just set value to missing?
                             # Stata sets value to missing, 
                             # does not promote float to double.
-                        
+        
+        smcl = "{err}" if IN_STATA else ""
         if str_clipped:
             msg = "{err}warning: some strings were shortened to 244 characters"
-            print(msg)
+            print(smcl + msg)
         if alt_missing:
-            print("{err}warning: some missing values inserted")
+            print(smcl + "warning: some missing values inserted")
             
         # header
         self._ds_format  = 115
@@ -4453,6 +4456,7 @@ class Dta115(Dta):
             for row, new_val in zip(varvals, values):
                 row.append(new_val)
             
+            smcl = "{err}" if IN_STATA else ""
             if init_st_type is not None and init_st_type != st_type:
                 if st_type <= 244:
                     # Probably shouldn't get here. Every type should be
@@ -4460,14 +4464,14 @@ class Dta115(Dta):
                     st_type_name = "str" + str(st_type)
                 else:
                     st_type_name = type_names[st_type - 251]
-                msg = ("{err}warning: some values were incompatible with " + 
+                msg = (smcl + "warning: some values were incompatible with " + 
                        "specified type;\n    type changed to " + st_type_name)
                 print(msg)
             if str_clipped:
-                print("{err}warning: some strings were " + 
+                print(smcl + "warning: some strings were " + 
                       "shortened to 244 characters")
             if alt_missing:
-                print("{err}warning: some missing values inserted")
+                print(smcl + "warning: some missing values inserted")
             
         
         self._typlist.append(st_type)
@@ -4619,6 +4623,7 @@ class Dta115(Dta):
                 varvals[row_num][col_num] = val
         
         seen_cols = set() # same column can appear multiple times
+        smcl = "{txt}" if IN_STATA else ""
         for old_type,c in zip(old_typlist, sel_cols):
             new_type = typlist[c]
             if old_type != new_type and c not in seen_cols:
@@ -4631,16 +4636,18 @@ class Dta115(Dta):
                 else:
                     new_name = type_names[new_type - 251]
                 msg = (
-                    "{txt}Stata type for " + 
+                    smcl,
+                    "Stata type for ",
                     "{} was {}, now {}".format(varlist[c], old_name, new_name))
-                print(msg)
+                print("".join(msg))
             seen_cols.add(c)
         
+        smcl = "{err}" if IN_STATA else ""
         if str_clipped:
-            msg = "{err}warning: some strings were shortened to 244 characters"
-            print(msg)
+            msg = "warning: some strings were shortened to 244 characters"
+            print(smcl + msg)
         if alt_missing:
-            print("{err}warning: some missing values inserted")
+            print(smcl + "warning: some missing values inserted")
         
     def _missing_save_val(self, miss_val, st_type):
         """helper function for writing dta files"""
@@ -5000,9 +5007,10 @@ class Dta117(Dta):
                             # This should maybe just set value to missing?
                             # Stata sets value to missing, 
                             # does not promote float to double.
-                        
+        
+        smcl = "{err}" if IN_STATA else ""        
         if alt_missing:
-            print("{err}warning: some missing values inserted")
+            print(smcl + "warning: some missing values inserted")
             
         # header
         self._ds_format  = 117
@@ -5244,16 +5252,17 @@ class Dta117(Dta):
             for row, new_val in zip(varvals, values):
                 row.append(new_val)
             
+            smcl = "{err}" if IN_STATA else ""
             if init_st_type is not None and init_st_type != st_type:
                 st_type_name = (
                     "str" + (str(st_type) if st_type <= 2045 else 'L') 
                     if st_type <= 32768 else type_names[65530 - st_type])
-                msg = ("{err}warning: some values were incompatible " + 
+                msg = (smcl + "warning: some values were incompatible " + 
                        "with specified type;\n    type changed to " + 
                        st_type_name)
                 print(msg)
             if alt_missing:
-                print("{err}warning: some missing values inserted")
+                print(smcl + "warning: some missing values inserted")
             
         
         self._typlist.append(st_type)
@@ -5421,6 +5430,7 @@ class Dta117(Dta):
         # Record seen columns. 
         # Use a set because same column can appear multiple times.
         seen_cols = set()
+        smcl = "{txt}" if IN_STATA else ""
         for old_type,c in zip(old_typlist, sel_cols):
             new_type = typlist[c]
             if old_type != new_type and c not in seen_cols:
@@ -5434,13 +5444,16 @@ class Dta117(Dta):
                         "str" + (str(new_type) if new_type <= 2045 else "L"))
                 else:
                     new_name = type_names[65530 - new_type]
-                msg = ("{{txt}}Stata type for {} was {}, now {}"
-                        ).format(varlist[c], old_name, new_name)
-                print(msg)
+                msg = (
+                    smcl,
+                    "Stata type for ",
+                    "{} was {}, now {}".format(varlist[c], old_name, new_name))
+                print("".join(msg))
             seen_cols.add(c)
         
+        smcl = "{err}" if IN_STATA else ""
         if alt_missing:
-            print("{err}warning: some missing values inserted")
+            print(smcl + "warning: some missing values inserted")
         
     def _missing_save_val(self, miss_val, st_type):
         """helper function for writing dta files"""
@@ -5750,20 +5763,25 @@ def display_diff(dta1, dta2, all_data=False):
         }
     }
     
+    different = False
+    
     # Python class types <-> dta version
     # ----------------------------------
     dta1_type, dta2_type = dta1.__class__.__name__, dta2.__class__.__name__
     if not dta1_type == dta2_type:
+        different = True
         print("    class types differ:")
         print("        {} vs {}".format(dta1_type, dta2_type))
     
     # data set descriptors
     # --------------------
     if not dta1._ds_format == dta2._ds_format:
+        different = True
         print("    formats differ:")
         print("        {} vs {}".format(dta1._ds_format, dta2._ds_format))
     
     if not dta1._data_label == dta2._data_label:
+        different = True
         print("    data labels differ:")
         print("        {} vs {}".format(dta1._data_label, dta2._data_label))
     
@@ -5778,17 +5796,20 @@ def display_diff(dta1, dta2, all_data=False):
     stamp1 = stamp1[:-1] + [int(x) for x in stamp1[-1].split(':')]  # hr & min
     stamp2 = stamp2[:-1] + [int(x) for x in stamp2[-1].split(':')]
     if not stamp1 == stamp2:
+        different = True
         print("    time stamps differ:")
         print("        {} vs {}".format(dta1._time_stamp, dta2._time_stamp))
     
     # number of variables and observations
     # ------------------------------------
     if not dta1._nvar == dta2._nvar:
+        different = True
         print("    # of vars differs:")
         print("        {} vs {}".format(dta1._nvar, dta2._nvar))
         print("   > comparison now limited to vars 0 .. min(nvar1, nvar2)")
     
     if not dta1._nobs == dta2._nobs:
+        different = True
         print("    # of obs differs:")
         print("        {} vs {}".format(dta1._nobs, dta2._nobs))
         print("   > comparison now limited to obs 0 .. min(nobs1, nobs2)")
@@ -5812,30 +5833,35 @@ def display_diff(dta1, dta2, all_data=False):
         diff = [i for i in range(nvar) 
                 if converter(older_dta._typlist[i]) != newer_dta._typlist[i]]
     if diff != []:
+        different = True
         print("    Stata data types differ in {} places".format(len(diff)))
         print("        first difference in position {}".format(diff[0]))
     
     # varlist
     diff = [i for i in range(nvar) if dta1._varlist[i] != dta2._varlist[i]]
     if diff != []:
+        different = True
         print("    variable names differ in {} places".format(len(diff)))
         print("        first difference in position {}".format(diff[0]))
         
     # srtlist
     diff = [i for i in range(nvar) if dta1._srtlist[i] != dta2._srtlist[i]]
     if diff != []:
+        different = True
         print("    sort lists differ in {} places".format(len(diff)))
         print("        first difference in position {}".format(diff[0]))
     
     # fmtlist
     diff = [i for i in range(nvar) if dta1._fmtlist[i] != dta2._fmtlist[i]]
     if diff != []:
+        different = True
         print("    display formats differ in {} places".format(len(diff)))
         print("        first difference in position {}".format(diff[0]))
         
     # lbllist
     diff = [i for i in range(nvar) if dta1._lbllist[i] != dta2._lbllist[i]]
     if diff != []:
+        different = True
         msg = "    attached value labels differ in {} places".format(len(diff))
         print(msg)
         print("        first difference in position {}".format(diff[0]))
@@ -5843,6 +5869,7 @@ def display_diff(dta1, dta2, all_data=False):
     # vlblist
     diff = [i for i in range(nvar) if dta1._vlblist[i] != dta2._vlblist[i]]
     if diff != []:
+        different = True
         print("    variable labels differ in {} places".format(len(diff)))
         print("        first difference in position {}".format(diff[0]))
       
@@ -5852,17 +5879,20 @@ def display_diff(dta1, dta2, all_data=False):
     keys2 = set(dta2._chrdict.keys())
     diff = keys1 - keys2
     if diff != set():
+        different = True
         print("    charataristic keys in #1 but not in #2:")
         print("       ", str(diff))
         
     diff = keys2 - keys1
     if diff != set():
+        different = True
         print("    charataristic keys in #2 but not in #1:")
         print("       ", str(diff))
         
     diff = [k for k in keys1.intersection(keys2) 
                 if dta1._chrdict[k] != dta2._chrdict[k]]
     if diff != []:
+        different = True
         print("    charataristic keys with different value:")
         print("       ", str(diff))
         
@@ -5872,17 +5902,20 @@ def display_diff(dta1, dta2, all_data=False):
     keys2 = set(dta2._vallabs.keys())
     diff = keys1 - keys2
     if diff != set():
+        different = True
         print("    value labels defined in #1 but not in #2:")
         print("       ", str(diff))
         
     diff = keys2 - keys1
     if diff != set():
+        different = True
         print("    value labels defined in #2 but not in #1:")
         print("       ", str(diff))
         
     diff = [k for k in keys1.intersection(keys2)
                 if dta1._vallabs[k] != dta2._vallabs[k]]
     if diff != []:
+        different = True
         print("    value labels with same name but different mapping:")
         print("       ", str(diff))
     
@@ -5892,11 +5925,13 @@ def display_diff(dta1, dta2, all_data=False):
         diff = sum([0] + [1 for i in range(nobs) for j in range(nvar)
                     if dta1._varvals[i][j] != dta2._varvals[i][j]])
         if diff != 0:
+            different = True
             print("    data values differ in " + str(diff) + " places")
     else:
         for i in range(nobs):
             for j in range(nvar):
                 if dta1._varvals[i][j] != dta2._varvals[i][j]:
+                    different = True
                     print("".join(
                         ("    data values differ\n        ",
                         "first difference in position {},{}".format(i,j))))
@@ -5907,6 +5942,8 @@ def display_diff(dta1, dta2, all_data=False):
             # trick from http://stackoverflow.com/questions/653509 
             # to exit from nested for loops
 
+    if not different:
+        print("    no difference found")
 
 def open_dta(address):
     """Open any recent version dta file (versions 114, 115, 117) .
