@@ -10,7 +10,7 @@ import copy
 import sys
 
 from .stata_missing import (get_missing, MissingValue,
-                                     MISSING, MISSING_VALS)
+                            MISSING, MISSING_VALS)
 
 try:
     from stata import st_format
@@ -618,12 +618,21 @@ class Dta():
         Parameters
         ----------
         in_ : iterable, optional
-            Iterable of int values. Default is all observations.
+            Used to specify observations to drop.
+            Should be an iterable of int.
+            Default is all observations.
         if_ : function, optional
-            Should be a function taking int and returning Boolean 
-            (or coercible to Boolean). Default is True for all obs.
+            Used to specify observations to drop.
+            Should be a function taking int and 
+            returning Boolean (or coercible to Boolean).
+            Default is True for all obs.
         all_obs : bool or coercible to Boolean, optional
             Option to drop all observations. Default value is False.
+            
+        Parameters note
+        ---------------
+        If both `in_` and `if_` are used, the dropped observations
+        are the numbers in `in_` that satisfy `if_`.
         
         Returns
         -------
@@ -663,10 +672,19 @@ class Dta():
         Parameters
         ----------
         in_ : iterable, optional
-            Iterable of int values. Default is all observations
+            Used to specify observations to keep.
+            Should be an iterable of int.
+            Default is all observations.
         if_ : function, optional
-            Should be a function taking int and returning Boolean 
-            (or coercible to Boolean). Default is True for all obs.
+            Used to specify observations to keep.
+            Should be a function taking int and 
+            returning Boolean (or coercible to Boolean).
+            Default is True for all obs.
+            
+        Parameters note
+        ---------------
+        If both `in_` and `if_` are used, the kept observations
+        are the numbers in `in_` that satisfy `if_`.
         
         Returns
         -------
@@ -696,10 +714,10 @@ class Dta():
         Parameters
         ----------
         varnames : str, or iterable of str
-            Can be a str containing one varname (e.g., "mpg"),
-            a str with multiple varnames (e.g., "make price mpg"),
+            Can be a str containing one varname (e.g. "mpg"),
+            a str with multiple varnames (e.g. "make price mpg"),
             or an iterable of such str
-            (e.g., ("make", "price", "mpg") or ("make", "price mpg")).
+            (e.g. ("make", "price", "mpg") or ("make", "price mpg")).
             Abbreviations are allowed if unambiguous.
         
         Returns
@@ -762,10 +780,10 @@ class Dta():
         Parameters
         ----------
         varnames : str, or iterable of str
-            Can be a str containing one varname (e.g., "mpg"),
-            a str with multiple varnames (e.g., "make price mpg"),
+            Can be a str containing one varname (e.g. "mpg"),
+            a str with multiple varnames (e.g. "make price mpg"),
             or an iterable of such str
-            (e.g., ("make", "price", "mpg") or ("make", "price mpg")).
+            (e.g. ("make", "price", "mpg") or ("make", "price mpg")).
             Abbreviations are allowed if unambiguous.
         
         Returns
@@ -1364,10 +1382,10 @@ class Dta():
         ----------
         varnames : str, or iterable of str, optional
             Default is none specified (i.e. summarize all).
-            Can be a str containing one varname (e.g., "mpg"),
-            a str with multiple varnames (e.g., "make price mpg"),
+            Can be a str containing one varname (e.g. "mpg"),
+            a str with multiple varnames (e.g. "make price mpg"),
             or an iterable of such str
-            (e.g., ("make", "price", "mpg") or ("make", "price mpg")).
+            (e.g. ("make", "price", "mpg") or ("make", "price mpg")).
             Abbreviations are allowed if unambiguous.
         detail : bool (or coercible to bool)
             May not be combined with `meanonly`.
@@ -1393,15 +1411,21 @@ class Dta():
             May not be combined with other weights.
             May not be combined with `detail` option.
         in_ : iterable, optional
-            Iterable of int values. Default is all observations.
+            Used to specify observations to include in summary.
+            Should be an iterable of int.
+            Default is all observations.
         if_ : function, optional
-            Should be a function taking int and returning Boolean 
-            (or coercible to Boolean). Default is True for all obs.
+            Used to specify observations to include in summary.
+            Should be a function taking int and 
+            returning Boolean (or coercible to Boolean).
+            Default is True for all obs.
             
         Parameters note
         ---------------
         Above parameters can be accessed by name.
         Otherwise, the parameters appear in the above order.
+        If both `in_` and `if_` are used, the summarized observations
+        are the numbers in `in_` that satisfy `if_`.
         
         Returns
         -------
@@ -1455,10 +1479,10 @@ class Dta():
         Parameters
         ----------
         varnames : str, or iterable of str
-            Can be a str containing one varname (e.g., "mpg"),
-            a str with multiple varnames (e.g., "make price mpg"),
+            Can be a str containing one varname (e.g. "mpg"),
+            a str with multiple varnames (e.g. "make price mpg"),
             or an iterable of such str
-            (e.g., ("make", "price", "mpg") or ("make", "price mpg")).
+            (e.g. ("make", "price", "mpg") or ("make", "price mpg")).
             Abbreviations are allowed if unambiguous.
         
         Returns
@@ -1630,16 +1654,25 @@ class Dta():
         ----------
         varnames : str, or iterable of str, optional
             Default is none specified (i.e. list all).
-            Can be a str containing one varname (e.g., "mpg"),
-            a str with multiple varnames (e.g., "make price mpg"),
+            Can be a str containing one varname (e.g. "mpg"),
+            a str with multiple varnames (e.g. "make price mpg"),
             or an iterable of such str
-            (e.g., ("make", "price", "mpg") or ("make", "price mpg")).
+            (e.g. ("make", "price", "mpg") or ("make", "price mpg")).
             Abbreviations are allowed if unambiguous.
         in_ : iterable, optional
-            Iterable of int values. Default is all observations.
+            Used to specify observations to list.
+            Should be an iterable of int.
+            Default is all observations.
         if_ : function, optional
-            Should be a function taking int and returning Boolean 
-            (or coercible to Boolean). Default is True for all obs.
+            Used to specify observations to list.
+            Should be a function taking int and 
+            returning Boolean (or coercible to Boolean).
+            Default is True for all obs.
+            
+        Parameters note
+        ---------------
+        If both `in_` and `if_` are used, the listed observations
+        are the numbers in `in_` that satisfy `if_`.
         
         Returns
         -------
@@ -1719,10 +1752,10 @@ class Dta():
         Parameters
         ----------
         varnames : str, or iterable of str
-            Can be a str containing one varname (e.g., "mpg"),
-            a str with multiple varnames (e.g., "make price mpg"),
+            Can be a str containing one varname (e.g. "mpg"),
+            a str with multiple varnames (e.g. "make price mpg"),
             or an iterable of such str
-            (e.g., ("make", "price", "mpg") or ("make", "price mpg")).
+            (e.g. ("make", "price", "mpg") or ("make", "price mpg")).
             Abbreviations are allowed if unambiguous.
         last : bool (or coercible to bool), optional
             Signal that specified variables should come last in the
@@ -1949,8 +1982,96 @@ class Dta():
        
         # self._changed set to True in set_obs
         
+    def xpose(self, clear=False, varname=False):
+        """Transpose data. 
+        
+        Parameters
+        ----------
+        clear : Boolean , required
+            The purpose of this parameter is to remind the user
+            that this method replaces the data in the dataset.
+        
+        Returns
+        -------
+        None
+        
+        Note
+        ----
+        This method does not yet support the -promote- option in Stata.
+        
+        Side effects
+        ------------
+        Can change almost everything in the data set.
+        Replaces string values with missing.
+        Transposes numeric values in the data, and thus changing number
+        of observations, number of variables, variable names, etc.
+        Removes or replaces existing variable labels, characteristics, 
+        display formats, sort info.
+        
+        """   
+        if not clear:
+            raise ValueError("must specify clear=True to use xpose")
+        
+        # Without the -promote- option, any values outside the float range
+        # will be converted to MISSING.
+        convert = lambda x: (
+            x if (isinstance(x, MissingValue) or 
+                  -1.7014117331926443e+38 <= x <= 1.7014117331926443e+38) 
+            else MISSING
+        )
+        
+        # If varname=True, save old varnames to be added in later
+        if varname:
+            old_varnames = [v for v in self._varlist]
+        
+        # Change string values to missing values
+        nobs = range(self._nobs)
+        columns = [i for i in range(self._nvar) if self._isstrvar(i)]
+        varvals = self._varvals
+        for i in nobs:
+            for j in columns:
+                varvals[i][j] = MISSING
+            
+        # Transpose
+        self._varvals = [[convert(x) for x in row] 
+                         for row in zip(*self._varvals)]
+        
+        # Resize matrix nXm to mXn
+        self._nobs, self._nvar = self._nvar, self._nobs
+        new_nvar = self._nvar
+    
+        # Change format
+        self._fmtlist = ['%9.0g'] * new_nvar
+    
+        # Change type
+        new_type = self._default_new_type
+        self._typlist = [new_type] * new_nvar
+    
+        # Change names of Variabls
+        self._varlist = ['v' + str(i) for i in range(new_nvar)]
+    
+        # Change sort list to all Nones
+        self._srtlist = [None] * new_nvar
+    
+        # Change label list to all empties
+        self._lbllist = [''] * new_nvar
+    
+        # Change var label list to all empties
+        self._vlblist = [''] * new_nvar
+    
+        # Empty Character Dict
+        self._chrdict = {}
+        
+        # If varname=True , append old variable names in a new variable
+        # called _varname
+        if varname:
+            self.append_var("_varname", old_varnames)
+    
+        # Set changed to True
+        self._changed = True
+        
     def replace(self, id, values, in_=None, if_=None):
-        """Replace values in given data variable. 
+        """Replace values in given data variable.
         
         Parameters
         ----------
@@ -1960,11 +2081,22 @@ class Dta():
         values : iterable
             Can be a flat iterable like [1, 5, 9, ...] or iterable of
             rows, like [[1], [5], [9], ...].
+            Should have the same number of values as current number of
+            observations or as implied by `in_` and `if_`.
         in_ : iterable, optional
-            Iterable of int values. Default is all observations.
+            Used to specify observations replace.
+            Should be an iterable of int.
+            Default is all observations.
         if_ : function, optional
-            Should be a function taking int and returning Boolean 
-            (or coercible to Boolean). Default is True for all obs.
+            Used to specify observations replace.
+            Should be a function taking int and 
+            returning Boolean (or coercible to Boolean).
+            Default is True for all obs.
+            
+        Parameters note
+        ---------------
+        If both `in_` and `if_` are used, the replaced observations
+        are the numbers in `in_` that satisfy `if_`.
         
         Returns
         -------
@@ -3207,7 +3339,7 @@ class Dta():
         """Replace values in specified obs and vars of -index- tuple.
         The shape of -value- should match the shape implied by -index-,
         and sub-values should be consistent with existing Stata types
-        (e.g., non-string values cannot be added to string columns).
+        (e.g. non-string values cannot be added to string columns).
         
         """
         if not isinstance(index, tuple) or len(index) > 2:
@@ -3266,16 +3398,16 @@ class Dta():
         Parameters
         ----------
         varnames : str, or iterable of str
-            Can be a str containing one varname (e.g., "mpg"),
-            a str with multiple varnames (e.g., "make price mpg"),
+            Can be a str containing one varname (e.g. "mpg"),
+            a str with multiple varnames (e.g. "make price mpg"),
             or an iterable of such str
-            (e.g., ("make", "price", "mpg") or ("make", "price mpg")).
+            (e.g. ("make", "price", "mpg") or ("make", "price mpg")).
             Abbreviations are allowed if unambiguous.
         fmts : str, or iterable of str
-            Can be a str containing one format (e.g., "%9.2f"),
-            a str with multiple formats (e.g., "%9.2f %12s %9.0g"),
+            Can be a str containing one format (e.g. "%9.2f"),
+            a str with multiple formats (e.g. "%9.2f %12s %9.0g"),
             or an iterable of such str
-            (e.g., ("%9.2f", "%12s", "%9.0g") or ("%9.2f", "%12s %9.0g")).
+            (e.g. ("%9.2f", "%12s", "%9.0g") or ("%9.2f", "%12s %9.0g")).
         
         Notes
         -----
@@ -4005,6 +4137,7 @@ class Dta115(Dta):
     _default_fmt_widths = {251: 8, 252: 8, 253: 12, 254: 9, 255: 10}
     _default_fmts = {251: '%8.0g', 252: '%8.0g', 
                      253: '%12.0g', 254: '%9.0g', 255: '%10.0g'}
+    _default_new_type = 254
     
     def _isstrvar(self, index):
         """determine whether Stata variable is string"""
@@ -4818,6 +4951,7 @@ class Dta117(Dta):
     _default_fmt_widths = {65530: 8, 65529: 8, 65528: 12, 65527: 9, 65526: 10}
     _default_fmts = {65530: '%8.0g', 65529: '%8.0g', 
                      65528: '%12.0g', 65527: '%9.0g', 65526: '%10.0g'}
+    _default_new_type = 65527
     
     def _isstrvar(self, index):
         """determine if Stata variable is string"""
