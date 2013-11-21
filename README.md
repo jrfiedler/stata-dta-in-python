@@ -5,9 +5,9 @@ This is a package for using Stata .dta files in Python. The main functionality o
 
 You can create `Dta` objects from .dta files or from iterables of Python values. You can manipulate `Dta` objects in basic ways (add observations, replace data values, rename data variables etc.), and you can save `Dta` objects to .dta files. 
 
-This package was written and tested using Python 3.3. Some parts of this package do not work in Python 2. Support for Python 2 might be added at some later date.
+This package was written and tested using Python 3.3. Some parts of this package do not work in Python 2. Support for Python 2 might be added at a later date.
 
-Currently, this package supports .dta file formats 114, 115, and 117 (see [-help dta-](http://www.stata.com/help.cgi?dta)).
+Currently, this package supports .dta file formats 114, 115, and 117.
 
 
 Installation
@@ -109,6 +109,11 @@ Contributors
 ------------
 - James Fiedler
 - Matthew Koslovsky
+
+
+Contact
+-------
+James Fiedler, jrfiedler@gmail.com
 
 
 License
