@@ -27,7 +27,7 @@ The `stata_dta` package contains
 Opening a .dta file
 ===================
 
-As in the example, above, you can open a .dta file using the `open_dta()` function, which is useful if you don't know the file's version. If you know the file's version, you can use `Dta115` or `Dta117` directly to open the file.
+You can open a .dta file using the `open_dta()` function, which is useful if you don't know the file's version. If you know the file's version, you can use `Dta115` or `Dta117` directly to open the file.
 
     >>> from stata_dta import open_dta, Dta115, Dta117
     
@@ -46,7 +46,7 @@ As in the example, above, you can open a .dta file using the `open_dta()` functi
     ('Dta115', 'Dta117')
 
 
-You can also use `Dta117` to open a version 115 data set, if you want to convert the data set to version 117. You can do the opposite conversion as well, but be aware that converting a version 117 data set to version 115 could lead to loss of information if the version 117 file contains strLs (for explanation of "strLs", see end of [-help strings-](http://www.stata.com/help.cgi?strings)).
+You can also use `Dta117` to open a version 115 data set, if you want to convert the data set to version 117. You can do the opposite conversion as well, but converting a version 117 data set to version 115 could lead to loss of information if the version 117 file contains strLs (for explanation of "strLs", see the end of [-help strings-](http://www.stata.com/help.cgi?strings)).
 
     >>> dta117to115 = Dta115("C:/Program Files (x86)/Stata13/auto.dta")
     file format is 117, converting to 115
@@ -61,7 +61,7 @@ You can also use `Dta117` to open a version 115 data set, if you want to convert
 Creating Dta object from Python values
 ==========================================
 
-You can also use `Dta115` and `Dta117` to create `Dta` objects from Python iterables. The given iterable should be organized like `[row0, row1, ...]` where each `row` is itself an iterable. Values inside rows should be `int`, `float`, `str`, or `MissingValue` instance (see below). `None` is allowed in place of a `MissingValue` instance. In format 117 .dta files bytes values are allowed, so `Dta117` allowes `bytes` and `bytearray` objects.
+You can also use `Dta115` and `Dta117` to create `Dta` objects from Python iterables. The given iterable should be organized like `[row0, row1, ...]` where each `row` is itself an iterable. Values inside rows should be `int`, `float`, `str`, or `MissingValue` instance (see below). `None` is allowed in place of a `MissingValue` instance. Format 117 dta files allow bytes values, so `Dta117` allowes `bytes` and `bytearray` objects.
 
 Some care should be taken to ensure types are not mixed in the same column. `MissingValue` instances are considered numeric, so should not be used for a missing `str` value.
 
@@ -171,7 +171,7 @@ As shown above, the submodule `stata_missing` implements analogs of Stata's miss
 Subscripting
 ============
 
-To access a data subset, use the syntax `dta[rows, cols]`, where `rows` is either an integer or an iterable of integer. The `cols` can be an integer or iterable of integer, but it can also be a string abbreviation of one or more data variable names or an integer of such strings. Repeated columns, whether by integer or string, are not permitted.
+To access a data subset, use the syntax `dta[rows, cols]`, where `rows` is either an integer or an iterable of integer. The `cols` can be an integer or iterable of integer, but it can also be a string abbreviation of one or more data variable names or an integer of such strings. The examples below may help to understand what's allowed in ``cols``. Repeated columns, whether integer or string, are not permitted.
 
 The `cols` is optional, but everything else in `dta[rows, cols]` is required, including the comma. 
 
