@@ -17,7 +17,7 @@ Download the package, either with
 
     git clone http://github.com/jrfiedler/stata-dta-in-python
 
-or by downloading a zip archive (button on top left of this page) and unzipping. 
+or by downloading a zip archive (there's a button on the right side of this page) and unzipping. 
 
 Then, in the main folder, use
 
