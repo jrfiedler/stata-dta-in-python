@@ -21,7 +21,7 @@ Installation
 
 Download the package, either with
 
-    git clone http://github.com/jrfiedler/stata-dta-in-python
+    git clone https://github.com/jrfiedler/stata-dta-in-python
 
 or by downloading a zip archive (there's a button on the right side of this page) and unzipping. 
 
