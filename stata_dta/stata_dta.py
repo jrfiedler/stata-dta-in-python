@@ -245,10 +245,7 @@ class Dta():
                 print("file format is {}, converting to 117".format(version))
                 self._convert_dta(Dta115)
         else:
-            #try:
             self._file_to_Dta117(address)
-            #except DtaParseError as e:
-            #    raise DtaParseError(e.args[0] if e.args else '') from None
             if not isinstance(self, Dta117):
                 print("file format is {}, converting to 115".format(version))
                 self._convert_dta(Dta117)
@@ -297,7 +294,7 @@ class Dta():
             
         if os.path.isfile(address) and not replace:
             msg = ("file exists; use replace option to overwrite")
-            raise FileExistsError(msg)
+            raise IOError(msg)
             
         self._dta_obj_to_file(address)
         self._changed = False
@@ -601,8 +598,8 @@ class Dta():
             return
         isstrvar = self._isstrvar
         empty_row = ['' if isstrvar(i) else MISSING for i in range(self._nvar)]
-        copy_row = empty_row.copy
-        self._varvals += [copy_row() for _ in range(num_obs - curr_obs)]
+        self._varvals += [copy.copy(empty_row) 
+                          for _ in range(num_obs - curr_obs)]
         self._nobs = num_obs
         self._changed = True
         # Need to clear srtlist. If there are string variables, there 
