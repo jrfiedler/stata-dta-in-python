@@ -14,20 +14,22 @@ Contents
 Basic information
 =================
 
-Three versions of .dta files are supported: 114, 115, and 117 (see [-help dta-](http://www.stata.com/help.cgi?dta) for a technical description of .dta formats).
+Three versions of .dta files are supported: 114, 115, and 117 (see -help dta- <http://www.stata.com/help.cgi?dta> for a technical description of .dta formats).
 
-The `stata_dta` package contains
+The ``stata_dta`` package contains
 
 - The Dta115 class, for .dta versions 114 and 115
 - The Dta117 class, for .dta version 117
-- `open_dta()` for opening .dta files, especially when the user does not know the file's version
-- `display_diff()` for displaying detailed information about differences between two `Dta` objects
+- ``open_dta()`` for opening .dta files, especially when the user does not know the file's version
+- ``display_diff()`` for displaying detailed information about differences between two ``Dta`` objects
 
 
 Opening a .dta file
 ===================
 
-You can open a .dta file using the `open_dta()` function, which is useful if you don't know the file's version. If you know the file's version, you can use `Dta115` or `Dta117` directly to open the file.
+You can open a .dta file using the ``open_dta()`` function, which is useful if you don't know the file's version. If you know the file's version, you can use ``Dta115`` or ``Dta117`` directly to open the file.
+
+::
 
     >>> from stata_dta import open_dta, Dta115, Dta117
     
@@ -46,7 +48,9 @@ You can open a .dta file using the `open_dta()` function, which is useful if you
     ('Dta115', 'Dta117')
 
 
-You can also use `Dta117` to open a version 115 data set, if you want to convert the data set to version 117. You can do the opposite conversion as well, but converting a version 117 data set to version 115 could lead to loss of information if the version 117 file contains strLs (for explanation of "strLs", see the end of [-help strings-](http://www.stata.com/help.cgi?strings)).
+You can also use ``Dta117`` to open a version 115 data set, if you want to convert the data set to version 117. You can do the opposite conversion as well, but converting a version 117 data set to version 115 could lead to loss of information if the version 117 file contains strLs (for explanation of "strLs", see the end of -help strings- <http://www.stata.com/help.cgi?strings>).
+
+::
 
     >>> dta117to115 = Dta115("C:/Program Files (x86)/Stata13/auto.dta")
     file format is 117, converting to 115
@@ -61,9 +65,11 @@ You can also use `Dta117` to open a version 115 data set, if you want to convert
 Creating Dta object from Python values
 ==========================================
 
-You can also use `Dta115` and `Dta117` to create `Dta` objects from Python iterables. The given iterable should be organized like `[row0, row1, ...]` where each `row` is itself an iterable. Values inside rows should be `int`, `float`, `str`, or `MissingValue` instance (see below). `None` is allowed in place of a `MissingValue` instance. Format 117 dta files allow bytes values, so `Dta117` allowes `bytes` and `bytearray` objects.
+You can also use ``Dta115`` and ``Dta117`` to create ``Dta`` objects from Python iterables. The given iterable should be organized like ``[row0, row1, ...]`` where each ``row`` is itself an iterable. Values inside rows should be ``int``, ``float``, ``str``, or ``MissingValue`` instance (see below). ``None`` is allowed in place of a ``MissingValue`` instance. Format 117 dta files allow bytes values, so ``Dta117`` allowes ``bytes`` and ``bytearray`` objects.
 
-Some care should be taken to ensure types are not mixed in the same column. `MissingValue` instances are considered numeric, so should not be used for a missing `str` value.
+Some care should be taken to ensure types are not mixed in the same column. ``MissingValue`` instances are considered numeric, so should not be used for a missing ``str`` value.
+
+::
 
     >>> v = [[0.0, 0.1, 0.2], [1.0, 1.1, 1.2], [2.0, 2.1, 2.2]]
     >>> dta = Dta117(v)
@@ -89,13 +95,15 @@ Some care should be taken to ensure types are not mixed in the same column. `Mis
      2. |        1.5          .d         2.2 |
         +------------------------------------+
 
-The `Dta` constructors will promote to the least restrictive type of the inputs when input types are mixed. Roughly, restrictiveness goes integer < float < string < strL (string or bytes) for format 117, or just integer < float < string for format 115.
+The ``Dta`` constructors will promote to the least restrictive type of the inputs when input types are mixed. Roughly, restrictiveness goes integer < float < string < strL (string or bytes) for format 117, or just integer < float < string for format 115.
 
 
 Saving Dta object to .dta file
 ==============================
 
-Use the `save()` method to save a `Dta` object to file. If the `Dta` was created from file, or if it has been saved once already, no address is needed.
+Use the ``save()`` method to save a ``Dta`` object to file. If the ``Dta`` was created from file, or if it has been saved once already, no address is needed.
+
+::
 
     [continuing from last example]
     >>> dta.list()
@@ -150,7 +158,9 @@ Use the `save()` method to save a `Dta` object to file. If the `Dta` was created
 Missing values
 ==============
 
-As shown above, the submodule `stata_missing` implements analogs of Stata's missing values. The analogs are instances of class `MissingValue`. The 27 regular missing values `.`, `.a`, `.b`, etc. are contained in the tuple `stata_missing.MISSING_VALS` and the `.` missing value is also given the name `stata_missing.MISSING`. Users should access these analogs rather than create their own with `MissingValue`. The 'extended' missing values from Stata are not supported.
+As shown above, the submodule ``stata_missing`` implements analogs of Stata's missing values. The analogs are instances of class ``MissingValue``. The 27 regular missing values ``.``, ``.a``, ``.b``, etc. are contained in the tuple ``stata_missing.MISSING_VALS`` and the ``.`` missing value is also given the name ``stata_missing.MISSING``. Users should access these analogs rather than create their own with ``MissingValue``. The 'extended' missing values from Stata are not supported.
+
+::
 
     >>> from stata_dta.stata_missing import MISSING as mv, MISSING_VALS as mvs
     >>> mv
@@ -171,14 +181,16 @@ As shown above, the submodule `stata_missing` implements analogs of Stata's miss
 Subscripting
 ============
 
-To access a data subset, use the syntax `dta[rows, cols]`, where `rows` is either an integer or an iterable of integer. The `cols` can be an integer or iterable of integer, but it can also be a string abbreviation of one or more data variable names or an integer of such strings. The examples below may help to understand what's allowed in ``cols``. Repeated columns, whether integer or string, are not permitted.
+To access a data subset, use the syntax ``dta[rows, cols]``, where ``rows`` is either an integer or an iterable of integer. The ``cols`` can be an integer or iterable of integer, but it can also be a string abbreviation of one or more data variable names or an integer of such strings. The examples below may help to understand what's allowed in ``cols``. Repeated columns, whether integer or string, are not permitted.
 
-The `cols` is optional, but everything else in `dta[rows, cols]` is required, including the comma. 
+The ``cols`` is optional, but everything else in ``dta[rows, cols]`` is required, including the comma. 
 
 Data subsets
 ------------
 
-If using subscripting and not assigning values, the subscripting creates a new `Dta` instance.
+If using subscripting and not assigning values, the subscripting creates a new ``Dta`` instance.
+
+::
 
     >>> dta117 = open_dta("C:/Program Files (x86)/Stata13/auto.dta")
     (1978 Automobile Data)
@@ -210,6 +222,8 @@ Assigning new values
 --------------------
 
 The same subscripting syntax is used to assign values to a subset. The new values should be contained in an iterable with the same shape as what's being assigned to. New string values cannot be assigned to numeric data variables and vice versa.
+
+::
 
     >>> v = [[0.0, 0.1, 0.2], [1, 1.1, None], [1.5, mvs[4], 2.2]]
     >>> dta = Dta117(v)
@@ -276,7 +290,9 @@ The same subscripting syntax is used to assign values to a subset. The new value
 Other
 =====
 
-Aside from the functionality in the above examples, you can use `dir(Dta117)` and `help(Dta117.<method_name>)` to find most of the functionality of the package.
+Aside from the functionality in the above examples, you can use ``dir(Dta117)`` and ``help(Dta117.<method_name>)`` to find most of the functionality of the package.
+
+::
 
     >>> public = [x for x in dir(Dta117) if not x.startswith("_")]
     >>> template = "  {:<16}{:<16}{:<16}"
@@ -353,8 +369,8 @@ Aside from the functionality in the above examples, you can use `dir(Dta117)` an
     
         Parameters note
         ---------------
-        If both `in_` and `if_` are used, the listed observations
-        are the numbers in `in_` that satisfy `if_`.
+        If both ``in_`` and ``if_`` are used, the listed observations
+        are the numbers in ``in_`` that satisfy ``if_``.
     
         Returns
         -------

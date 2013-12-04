@@ -1,9 +1,9 @@
 Stata dta in Python
 ===================
 
-This is a package for using Stata .dta files in Python. The main functionality of the package is in its `Dta` class and subclasses, which encapsulate the information from a .dta file, and provide methods for adding, replacing, or deleting this information. 
+This is a package for using Stata .dta files in Python. The main functionality of the package is in its ``Dta`` class and subclasses, which encapsulate the information from a .dta file, and provide methods for adding, replacing, or deleting this information. 
 
-You can create `Dta` objects from .dta files or from iterables of Python values. You can manipulate `Dta` objects in basic ways (add observations, replace data values, rename data variables etc.), and you can save `Dta` objects to .dta files. 
+You can create ``Dta`` objects from .dta files or from iterables of Python values. You can manipulate ``Dta`` objects in basic ways (add observations, replace data values, rename data variables etc.), and you can save ``Dta`` objects to .dta files. 
 
 This package has been tested on Python 3.1, 3.2, and 3.3. Some parts of this package do not work in Python 2. Support for Python 2 might be added at a later date.
 
@@ -19,13 +19,13 @@ Python 3.1, 3.2, or 3.3
 Installation
 ------------
 
-Download the package, either with
+Download the package, either with::
 
     git clone https://github.com/jrfiedler/stata-dta-in-python
 
 or by downloading a zip archive (there's a button on the right side of this page) and unzipping. 
 
-Then, in the main folder, use
+Then, in the main folder, use::
 
     python setup.py install
 
@@ -35,7 +35,10 @@ to install.
 Example usage
 -------------
 
+::
+
     >>> from stata_dta import open_dta, display_diff
+    
     >>> dta1 = open_dta("C:/Program Files (x86)/Stata12/auto.dta")
     (1978 Automobile Data)
 
