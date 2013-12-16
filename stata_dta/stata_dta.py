@@ -1130,9 +1130,17 @@ class Dta():
     
     def _obs_from_in_if(self, in_=None, if_=None):
         """helper for any method that takes in_ and if_ observation args"""
+        
         if in_ is not None:
-            if not isinstance(in_, collections.Iterable):
-                raise TypeError("in_ option should be iterable")
+            if isinstance(in_, int):
+                in_ = (in_,)
+            elif (isinstance(in_, str) or 
+                    not isinstance(in_, collections.Iterable)):
+                raise TypeError("in_ option should be int or iterable of int")
+            else:
+                in_ = tuple(in_)
+                if not all(isinstance(i, int) for i in in_):
+                    raise TypeError("in_ should be int or iterable of int")
         else:
             in_ = range(self._nobs)
             
@@ -1731,12 +1739,16 @@ class Dta():
         print(row_tplt.format(spacer, row_info))
         
         # values
-        for i, obs_count in enumerate(obs):
+        for obs_count, i in enumerate(obs):
             if obs_count % separator == 0:
                 print(mid_line)
             row = varvals[i]
             row_info = "  ".join(list_format(fmts[j], row[j]) for j in indexes)
-            print(row_tplt.format(rownum_tplt.format(i), row_info))
+            row_info = row_tplt.format(rownum_tplt.format(i), row_info)
+            try:
+                print(row_info)
+            except UnicodeEncodeError:
+                print(row_info.encode('ascii', 'replace').decode())
         
         print(bot_line)
     
@@ -3853,11 +3865,18 @@ class Dta():
                     65527: ['f',4], 65526: ['d',8]}
             
         get_str = lambda n: (
-            unpack(str(n) + 's', sfile.read(n))[0].decode('iso-8859-1'))
+            unpack(
+                str(n) + 's',
+                sfile.read(n)
+            )[0].decode('iso-8859-1')
+        )
         
         get_term_str = lambda n: (
-            (unpack(str(n) + 's', sfile.read(n))[0].partition(b'\0')
-             )[0].decode('iso-8859-1'))
+            unpack(
+                str(n) + 's', 
+                sfile.read(n)
+            )[0].partition(b'\0')[0].decode('iso-8859-1')
+        )
 
         def missing_object(miss_val, st_type):
             if st_type == 65530: # byte
@@ -4041,7 +4060,7 @@ class Dta():
                 if t == 130:
                     new_str = (
                         unpack(str(str_len) + 's', sfile.read(str_len))[0]
-                        )[:-1].decode('iso-8859-1')
+                    )[:-1].decode('iso-8859-1')
                 else:
                     new_str = sfile.read(str_len)
                 strls.update({vo: new_str})
