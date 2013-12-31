@@ -445,6 +445,163 @@ class Dta():
         # if name has not been encountered, add to list and set of encountered
         return [m[1] for m in matches 
                 if m[1] not in seen and not seen.add(m[1])]
+    
+    def describe(self, simple=False, short=False, 
+                 fullnames=False, numbers=False, varlist=False):
+        """Display a description of the data set.
+        
+        Paramters
+        ---------
+        simple : bool (or coercible to bool), optional
+            Specify that only a list of variable names be displayed.
+            No other options may be combined with `simple`.
+            Default value is False.
+        short : bool (or coercible to bool), optional
+            Specify that only data set information be displayed.
+            No information about individual variables will be displayed.
+            Default value is False.
+        fullnames : bool (or coercible to bool), optional
+            Specify that full variable names be used.
+            Default value is False.
+        numbers : bool (or coercible to bool), optional
+            Specify that variables' numbers be included.
+            Default value is False.
+        varlist : bool (or coercible to bool), optional
+            Specify that sortlist and varlist information be saved
+            (accessible via the `return_list` method).
+            Default value is False.
+            
+        Returns
+        -------
+        None
+        
+        Side effects
+        ------------
+        Displays description of data set. Saves associated values,
+        which can be displayed with `return_list` method.
+        
+        """
+        
+        varlist_opt = varlist  # "varlist" below will mean self._varlist
+        
+        squish = self._squish_name
+        varlist = self._varlist
+        srtlist = self._srtlist
+        nvar = self._nvar
+        nobs = self._nobs
+        width = self.width
+        txt, res = ("{txt}", "{res}") if IN_STATA else ("", "")
+        
+        # basic return values are the same for all descriptions
+        self._return_values = {
+            'changed': self._changed,
+            'width': width,
+            'k': nvar,
+            'N': nobs,
+            'key_order': ('changed', 'width', 'k', 'N')
+        }
+        
+        if simple:
+            if any((short, fullnames, numbers, varlist_opt)):
+                msg = "simple may not be combined with other options"
+                raise ValueError(msg)
+            
+            print(txt, end="")
+            for i in range(nvar):
+                print("{:<14}".format(varlist[i]), end="" if (i+1)%5 else "\n")
+            print("\n" if nvar%5 else "")  # to add line before next prompt
+            return
+        
+        size = self.width * self._nobs
+        sort_names = " ".join(varlist[j] for j in srtlist if j is not None)
+        
+        # if varlist_opt, add srtlist and varlist info to return_values
+        if varlist_opt:
+            self._return_values.update({
+                'sortlist': sort_names,
+                'varlist': " ".join(varlist),
+                'key_order': (
+                    'changed',
+                    'width',
+                    'k',
+                    'N',
+                    'sortlist',
+                    'varlist'
+                )
+            })
+        
+        # short and non-short descriptions share header and footer
+        print(
+            "\n{}  obs:{} {:>13}".format(txt, res, self._nobs),
+            " " * 25,
+            end=""
+        )
+        i = 34
+        label = self._data_label
+        lablength = len(label)
+        print(label[:i])
+        while i < lablength:
+            i += 32
+            print(" " * 47, label[:i])
+        
+        print(
+            "{} vars:{} {:>13}".format(txt, res, self._nvar),
+            " " * 24,
+            self._time_stamp
+        )
+        
+        if '_dta' in self._chrdict and 'note0' in self._chrdict['_dta']:
+            note_text = " " * 25 + "(_dta has notes)"
+        else:
+            note_text = ""
+        print("{} size:{} {:>13}".format(txt, res, size), note_text)
+        
+        # add the stuff that's not in short version
+        if not short:
+            typlist = self._typlist
+            fmtlist = self._fmtlist
+            get_type_name = self._get_type_name
+            lbllist = self._lbllist
+            vlblist = self._vlblist
+            
+            hline = "-" * 80
+            print(hline)
+            print("              storage   display    value")
+            print("variable name   type    format     label      variable label")
+            print(hline)
+            name_size = 8 if numbers else 15
+            for i in range(nvar):
+                if fullnames:
+                    name = varlist[i]
+                    if len(name) > name_size:
+                        name += "\n" + " " * 15
+                else:
+                    name = squish(varlist[i], name_size)
+                if len(name) < name_size:
+                    name += " " * (name_size - len(name))
+                num = "{}{:>5}. ".format(txt, i) if numbers else ""
+                fmt = fmtlist[i]
+                lbl = lbllist[i]
+                print(
+                    num,
+                    "{}{} ".format(res, name),
+                    "{}{:<7} {:<10} {:<10} {}{}".format(
+                        txt,
+                        get_type_name(typlist[i]), 
+                        fmt if len(fmt) <= 10 else fmt[:8] + "..",
+                        lbl if len(lbl) <= 10 else lbl[:8] + "..",
+                        res,
+                        vlblist[i][:34]
+                    ),
+                    sep=''
+                )
+            print(hline)
+        
+        # footer
+        print("{}Sorted by:  {}{}".format(txt, res, sort_names))
+        if self._changed:
+            print("     Note:  dataset has changed since last saved")
+        print("")
                 
     def return_list(self):
         """Display any saved results for this dta object.
@@ -463,12 +620,14 @@ class Dta():
             print("")
             return
         rv = self._return_values
-        keys = rv.keys if 'key_order' not in rv else rv['key_order']
+        keys = rv.keys() if 'key_order' not in rv else rv['key_order']
         tplt = "{{txt}}{:>22} = {{res}}{}" if IN_STATA else "{:>22} = {}"
         
         print("")
         for key in keys:
-            print(tplt.format(key, rv[key]))
+            value = str(rv[key])
+            if len(value) > 55: value = value[:53] + ".."
+            print(tplt.format(key, value))
         if not IN_STATA: print("")
     
     def index(self, varname):
@@ -1439,7 +1598,7 @@ class Dta():
         Side effects
         ------------
         Displays summary of specified variable(s). Saves the values
-        from the last summary, which can be displayed with `return_list'.
+        from the last summary, which can be displayed with `return_list`.
         
         """
         (obs, (wt_type, wt_index), detail,
@@ -4106,6 +4265,9 @@ class Dta():
             if sfile.tell() != locs[13]:
                 raise DtaParseError("expected end of file")
         
+    def _get_type_name(self, st_type):
+        raise NotImplementedError
+    
     def _isstrvar(self, index):
         raise NotImplementedError
         
@@ -4151,9 +4313,27 @@ class Dta115(Dta):
     """  
     
     _default_fmt_widths = {251: 8, 252: 8, 253: 12, 254: 9, 255: 10}
-    _default_fmts = {251: '%8.0g', 252: '%8.0g', 
-                     253: '%12.0g', 254: '%9.0g', 255: '%10.0g'}
+    _default_fmts = {
+        251: '%8.0g',
+        252: '%8.0g', 
+        253: '%12.0g',
+        254: '%9.0g',
+        255: '%10.0g'
+    }
     _default_new_type = 254
+    
+    _type_names = {
+        251: 'byte',
+        252: 'int',
+        253: 'long',
+        254: 'float',
+        255: 'double'
+    }
+    
+    def _get_type_name(self, st_type):
+        """convert Stata type number to name"""
+        if st_type <= 244: return 'str' + str(st_type)
+        return self._type_names[st_type]
     
     def _isstrvar(self, index):
         """determine whether Stata variable is string"""
@@ -4383,7 +4563,7 @@ class Dta115(Dta):
         
         smcl = "{err}" if IN_STATA else ""
         if str_clipped:
-            msg = "{err}warning: some strings were shortened to 244 characters"
+            msg = "warning: some strings were shortened to 244 characters"
             print(smcl + msg)
         if alt_missing:
             print(smcl + "warning: some missing values inserted")
@@ -4607,12 +4787,7 @@ class Dta115(Dta):
             
             smcl = "{err}" if IN_STATA else ""
             if init_st_type is not None and init_st_type != st_type:
-                if st_type <= 244:
-                    # Probably shouldn't get here. Every type should be
-                    # coercible to str.
-                    st_type_name = "str" + str(st_type)
-                else:
-                    st_type_name = type_names[st_type - 251]
+                st_type_name = self._get_type_name(st_type)
                 msg = (smcl + "warning: some values were incompatible with " + 
                        "specified type;\n    type changed to " + st_type_name)
                 print(msg)
@@ -4707,7 +4882,6 @@ class Dta115(Dta):
         varvals = self._varvals
         typlist = self._typlist
         varlist = self._varlist
-        type_names = ('byte', 'int', 'long', 'float', 'double')
         old_typlist = [typlist[i] for i in sel_cols]
         
         str_clipped = False
@@ -4738,7 +4912,7 @@ class Dta115(Dta):
                     if isinstance(val, str):
                         msg = ("\"" + varlist[col_num] + "\" cannot take " + 
                                "string values; has Stata type " + 
-                               type_names[st_type-251])
+                               self._get_type_name(st_type))
                         raise TypeError(msg)
                     elif val is None:
                         val = MISSING
@@ -4776,18 +4950,13 @@ class Dta115(Dta):
         for old_type,c in zip(old_typlist, sel_cols):
             new_type = typlist[c]
             if old_type != new_type and c not in seen_cols:
-                if old_type <= 244:
-                    old_name = "str" + str(old_type)
-                else:
-                    old_name = type_names[old_type - 251]
-                if new_type <= 244:
-                    new_name = "str" + str(new_type)
-                else:
-                    new_name = type_names[new_type - 251]
+                old_name = self._get_type_name(old_type)
+                new_name = self._get_type_name(new_type)
                 msg = (
                     smcl,
                     "Stata type for ",
-                    "{} was {}, now {}".format(varlist[c], old_name, new_name))
+                    "{} was {}, now {}".format(varlist[c], old_name, new_name)
+                )
                 print("".join(msg))
             seen_cols.add(c)
         
@@ -4818,11 +4987,20 @@ class Dta115(Dta):
         """save dta object to disk"""
         global get_missing
         
-        type_dict = {251: ['b',1], 252: ['h',2], 
-                    253: ['l',4], 254: ['f',4], 255: ['d',8]}
-        first_missing = {251: 101, 252: 32741, 253: 2147483620, 
-                        254: float.fromhex('0x1.0p+127'), 
-                        255: float.fromhex('0x1.0p+1023')}
+        type_dict = {
+            251: ['b',1],
+            252: ['h',2], 
+            253: ['l',4],
+            254: ['f',4],
+            255: ['d',8]
+        }
+        first_missing = {
+            251: 101,
+            252: 32741,
+            253: 2147483620, 
+            254: float.fromhex('0x1.0p+127'),
+            255: float.fromhex('0x1.0p+1023')
+        }
         typlist = self._typlist
         nvar = self._nvar
         
@@ -4965,9 +5143,28 @@ class Dta117(Dta):
     
     """
     _default_fmt_widths = {65530: 8, 65529: 8, 65528: 12, 65527: 9, 65526: 10}
-    _default_fmts = {65530: '%8.0g', 65529: '%8.0g', 
-                     65528: '%12.0g', 65527: '%9.0g', 65526: '%10.0g'}
+    _default_fmts = {
+        65530: '%8.0g',
+        65529: '%8.0g', 
+        65528: '%12.0g',
+        65527: '%9.0g',
+        65526: '%10.0g'
+    }
     _default_new_type = 65527
+    
+    _type_names = {
+        65530: 'byte',
+        65529: 'int',
+        65528: 'long',
+        65527: 'float',
+        65526: 'double',
+        32768: 'strL'
+    }
+    
+    def _get_type_name(self, st_type):
+        """convert Stata type number to name"""
+        if st_type <= 2045: return 'str' + str(st_type)
+        return self._type_names[st_type]
     
     def _isstrvar(self, index):
         """determine if Stata variable is string"""
@@ -5404,13 +5601,10 @@ class Dta117(Dta):
             
             smcl = "{err}" if IN_STATA else ""
             if init_st_type is not None and init_st_type != st_type:
-                st_type_name = (
-                    "str" + (str(st_type) if st_type <= 2045 else 'L') 
-                    if st_type <= 32768 else type_names[65530 - st_type])
-                msg = (smcl + "warning: some values were incompatible " + 
-                       "with specified type;\n    type changed to " + 
-                       st_type_name)
-                print(msg)
+                st_type_name = self._get_type_name(st_type)
+                msg = ("warning: some values were incompatible with " + 
+                       "specified type;\n    type changed to " + st_type_name)
+                print(smcl + msg)
             if alt_missing:
                 print(smcl + "warning: some missing values inserted")
             
@@ -5502,7 +5696,6 @@ class Dta117(Dta):
         varvals = self._varvals
         typlist = self._typlist
         varlist = self._varlist
-        type_names = ('byte', 'int', 'long', 'float', 'double')
         # copy typlist to check changes against later
         old_typlist = [typlist[i] for i in sel_cols] 
         
@@ -5538,7 +5731,7 @@ class Dta117(Dta):
                            for t in (str, bytes, bytearray)):
                         msg = ("\"" + varlist[col_num] + "\" cannot take " + 
                                "string or bytes values; has Stata type " + 
-                               type_names[65530 - st_type])
+                               self._get_type_name(st_type))
                         raise TypeError(msg)
                     elif val is None:
                         val = MISSING
@@ -5584,20 +5777,13 @@ class Dta117(Dta):
         for old_type,c in zip(old_typlist, sel_cols):
             new_type = typlist[c]
             if old_type != new_type and c not in seen_cols:
-                if old_type <= 32768:
-                    old_name = (
-                        "str" + (str(old_type) if old_type <= 2045 else "L"))
-                else:
-                    old_name = type_names[65530 - old_type]
-                if new_type <= 32768:
-                    new_name = (
-                        "str" + (str(new_type) if new_type <= 2045 else "L"))
-                else:
-                    new_name = type_names[65530 - new_type]
+                old_name = self._get_type_name(old_type)
+                new_name = self._get_type_name(new_type)
                 msg = (
                     smcl,
                     "Stata type for ",
-                    "{} was {}, now {}".format(varlist[c], old_name, new_name))
+                    "{} was {}, now {}".format(varlist[c], old_name, new_name)
+                )
                 print("".join(msg))
             seen_cols.add(c)
         
@@ -5625,11 +5811,20 @@ class Dta117(Dta):
         """save dta object to disk"""
         global get_missing
         
-        type_dict = {65530: ['b',1], 65529: ['h',2], 65528: ['l',4], 
-                    65527: ['f',4], 65526: ['d',8] }
-        first_missing = {65530: 101, 65529: 32741, 65528: 2147483620, 
-                        65527: float.fromhex('0x1.0p+127'), 
-                        65526: float.fromhex('0x1.0p+1023')}
+        type_dict = {
+            65530: ['b',1],
+            65529: ['h',2],
+            65528: ['l',4], 
+            65527: ['f',4],
+            65526: ['d',8]
+        }
+        first_missing = {
+            65530: 101,
+            65529: 32741,
+            65528: 2147483620,
+            65527: float.fromhex('0x1.0p+127'),
+            65526: float.fromhex('0x1.0p+1023')
+        }
         typlist = self._typlist
         byteorder = self._byteorder
         nvar = self._nvar

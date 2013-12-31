@@ -90,6 +90,23 @@ Example usage
     [3, 3.1, 3.2, 3.3]
     
     >>> dta3 = Dta117(v)
+    >>> dta2.describe()
+    
+      obs:             4
+     vars:             4                          31 Dec 2013 17:11
+     size:            80
+    ----------------------------------------------------------------------
+                  storage   display    value
+    variable name   type    format     label      variable label
+    ----------------------------------------------------------------------
+    var0            byte    %8.0g
+    var1            double  %10.0g
+    var2            str3    %9s
+    var3            double  %10.0g
+    ----------------------------------------------------------------------
+    Sorted by:
+         Note:  dataset has changed since last saved
+
     >>> dta3.list()
         +---------------------------------------------+
         |     var0        var1       var2        var3 |

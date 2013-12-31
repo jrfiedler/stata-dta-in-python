@@ -294,27 +294,28 @@ Aside from the functionality in the above examples, you can use ``dir(Dta117)`` 
 
 ::
 
-    >>> public = [x for x in dir(Dta117) if not x.startswith("_")]
+    >>> public = [x for x in dir(Dta117) if not x.startswith("_")] + ["",""]
     >>> template = "  {:<16}{:<16}{:<16}"
     >>> for i in range(0, len(public)-3, 3):
     ...     print(template.format(*public[i:i+3]))
     ...
       append_obs      append_var      check
-      clonevar        copy            drop_obs
-      drop_var        drop_vars       format
-      index           ismissing       keep_obs
-      keep_var        keep_vars       label_copy
-      label_data      label_define    label_dir
-      label_drop      label_language  label_list
-      label_values    label_variable  list
-      note_add        note_drop       note_list
-      note_renumber   note_replace    note_search
-      notes_add       notes_drop      notes_list
-      notes_renumber  notes_replace   notes_search
-      order           rename          replace
-      return_list     save            set_obs
-      sort            summ            summarize
-      xpose
+      clonevar        copy            describe
+      drop_obs        drop_var        drop_vars
+      format          index           ismissing
+      keep_obs        keep_var        keep_vars
+      label_copy      label_data      label_define
+      label_dir       label_drop      label_language
+      label_list      label_values    label_variable
+      list            note_add        note_drop
+      note_list       note_renumber   note_replace
+      note_search     notes_add       notes_drop
+      notes_list      notes_renumber  notes_replace
+      notes_search    order           rename
+      replace         return_list     save
+      set_obs         sort            summ
+      summarize       to_list         variable
+      width           xpose
     
     >>> help(Dta117.check)
     Help on function check in module stata_dta.stata_dta:
