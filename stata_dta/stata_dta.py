@@ -582,6 +582,7 @@ class Dta():
                 num = "{}{:>5}. ".format(txt, i) if numbers else ""
                 fmt = fmtlist[i]
                 lbl = lbllist[i]
+                vlb = vlblist[i]
                 print(
                     num,
                     "{}{} ".format(res, name),
@@ -591,7 +592,7 @@ class Dta():
                         fmt if len(fmt) <= 10 else fmt[:8] + "..",
                         lbl if len(lbl) <= 10 else lbl[:8] + "..",
                         res,
-                        vlblist[i][:34]
+                        vlb if len(vlb) <= 34 else vlb[:32] + ".."
                     ),
                     sep=''
                 )
