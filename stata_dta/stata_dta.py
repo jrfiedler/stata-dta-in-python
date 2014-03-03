@@ -51,6 +51,520 @@ MONTH_ABBREV = {1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May', 6: 'Jun',
 class DtaParseError(Exception):
     pass
 
+    
+class DtaVarVals():
+    def __init__(self, values):
+        self.values = values
+    
+    def __setitem__(self, index, value):
+        self.values[index] = value
+        
+    def __getitem__(self, index):
+        return self.values[index]
+            
+    def __abs__(self):
+        return DtaVarVals([abs(v) for v in self.values])
+        
+    def __add__(self, other):
+        if isinstance(other, collections.Iterable):
+            return DtaVarVals([v + o for (v,o) in zip(self.values, other)])
+        return DtaVarVals([v + other for v in self.values])
+        
+    def __bool__(self):
+        return DtaVarVals([bool(v) for v in self.values])
+        
+    def __eq__(self, other):
+        if isinstance(other, collections.Iterable):
+            return DtaVarVals([v == o for (v,o) in zip(self.values, other)])
+        return DtaVarVals([v == other for v in self.values])
+        
+    def __float__(self, other):
+        return DtaVarVals([float(v) for v in self.values])
+        
+    def __floordiv__(self, other):
+        if isinstance(other, collections.Iterable):
+            return DtaVarVals([v // o for (v,o) in zip(self.values, other)])
+        return DtaVarVals([v // other for v in self.values])
+        
+    def __ge__(self, other):
+        if isinstance(other, collections.Iterable):
+            return DtaVarVals([v >= o for (v,o) in zip(self.values, other)])
+        return DtaVarVals([v >= other for v in self.values])
+        
+    def __gt__(self, other):
+        if isinstance(other, collections.Iterable):
+            return DtaVarVals([v > o for (v,o) in zip(self.values, other)])
+        return DtaVarVals([v > other for v in self.values])
+        
+    def __iadd__(self, other):
+        if isinstance(other, collections.Iterable):
+            self.values = [v + o for (v,o) in zip(self.values, other)]
+        else:
+            self.values = [v + other for v in self.values]
+        return self
+        
+    def __ifloordiv__(self, other):
+        if isinstance(other, collections.Iterable):
+            self.values = [v // o for (v,o) in zip(self.values, other)]
+        else:
+            self.values = [v // other for v in self.values]
+        return self
+        
+    def __imod__(self, other):
+        if isinstance(other, collections.Iterable):
+            self.values = [v % o for (v,o) in zip(self.values, other)]
+        else:
+            self.values = [v % other for v in self.values]
+        return self
+        
+    def __imul__(self, other):
+        if isinstance(other, collections.Iterable):
+            self.values = [v * o for (v,o) in zip(self.values, other)]
+        else:
+            self.values = [v * other for v in self.values]
+        return self
+        
+    def __int__(self):
+        return DtaVarVals([int(v) for v in self.values])
+        
+    def __ipow__(self, other):
+        if isinstance(other, collections.Iterable):
+            self.values = [v ** o for (v,o) in zip(self.values, other)]
+        else:
+            self.values = [v ** other for v in self.values]
+        return self
+        
+    def __isub__(self, other):
+        if isinstance(other, collections.Iterable):
+            self.values = [v - o for (v,o) in zip(self.values, other)]
+        else:
+            self.values = [v - other for v in self.values]
+        return self
+        
+    def __iter__(self):
+        values = self.values
+        for v in values:
+            yield v
+        
+    def __itruediv__(self, other):
+        if isinstance(other, collections.Iterable):
+            self.values = [v / o for (v,o) in zip(self.values, other)]
+        else:
+            self.values = [v / other for v in self.values]
+        return self
+        
+    def __le__(self, other):
+        if isinstance(other, collections.Iterable):
+            return DtaVarVals([v <= o for (v,o) in zip(self.values, other)])
+        return DtaVarVals([v <= other for v in self.values])
+        
+    def __lt__(self, other):
+        if isinstance(other, collections.Iterable):
+            return DtaVarVals([v < o for (v,o) in zip(self.values, other)])
+        return DtaVarVals([v < other for v in self.values])
+        
+    def __mod__(self, other):
+        if isinstance(other, collections.Iterable):
+            return DtaVarVals([v % o for (v,o) in zip(self.values, other)])
+        return DtaVarVals([v % other for v in self.values])
+        
+    def __mul__(self, other):
+        if isinstance(other, collections.Iterable):
+            return DtaVarVals([v * o for (v,o) in zip(self.values, other)])
+        return DtaVarVals([v * other for v in self.values])
+        
+    def __ne__(self, other):
+        if isinstance(other, collections.Iterable):
+            return DtaVarVals([v != o for (v,o) in zip(self.values, other)])
+        return DtaVarVals([v != other for v in self.values])
+        
+    def __neg__(self):
+        return DtaVarVals([-v for v in self.values])
+        
+    def __pos__(self):
+        return self
+        
+    def __pow__(self, other):
+        if isinstance(other, collections.Iterable):
+            return DtaVarVals([v ** o for (v,o) in zip(self.values, other)])
+        return DtaVarVals([v ** other for v in self.values])
+        
+    def __radd__(self, other):
+        if isinstance(other, collections.Iterable):
+            return DtaVarVals([o + v for (v,o) in zip(self.values, other)])
+        return DtaVarVals([other + v for v in self.values])
+        
+    def __rfloordiv__(self, other):
+        if isinstance(other, collections.Iterable):
+            return DtaVarVals([o // v for (v,o) in zip(self.values, other)])
+        return DtaVarVals([other // v for v in self.values])
+        
+    def __rmod__(self, other):
+        if isinstance(other, collections.Iterable):
+            return DtaVarVals([o % v for (v,o) in zip(self.values, other)])
+        return DtaVarVals([other % v for v in self.values])
+        
+    def __rmul__(self, other):
+        if isinstance(other, collections.Iterable):
+            return DtaVarVals([o * v for (v,o) in zip(self.values, other)])
+        return DtaVarVals([other * v for v in self.values])
+        
+    def __round__(self, n=None):
+        return DtaVarVals([round(v, n) for v in self.values])
+        
+    def __rpow__(self, other):
+        if isinstance(other, collections.Iterable):
+            return DtaVarVals([o ** v for (v,o) in zip(self.values, other)])
+        return DtaVarVals([other ** v for v in self.values])
+        
+    def __rsub__(self, other):
+        if isinstance(other, collections.Iterable):
+            return DtaVarVals([o - v for (v,o) in zip(self.values, other)])
+        return DtaVarVals([other - v for v in self.values])
+        
+    def __rtruediv__(self, other):
+        if isinstance(other, collections.Iterable):
+            return DtaVarVals([o / v for (v,o) in zip(self.values, other)])
+        return DtaVarVals([other / v for v in self.values])
+        
+    def __sub__(self, other):
+        if isinstance(other, collections.Iterable):
+            return DtaVarVals([v - o for (v,o) in zip(self.values, other)])
+        return DtaVarVals([v - other for v in self.values])
+        
+    def __truediv__(self, other):
+        if isinstance(other, collections.Iterable):
+            return DtaVarVals([v / o for (v,o) in zip(self.values, other)])
+        return DtaVarVals([v / other for v in self.values])
+        
+    
+class DtaVariable():
+    def __init__(self, dta_obj, name, index):
+        self.dta_obj = dta_obj
+        self.name = name
+    
+    def __setitem__(self, index, value):
+        self.dta_obj[index, dta.index(self.name)] = value
+        
+    def __getitem__(self, index):
+        dta = self.dta_obj
+        get = dta.get
+        c = dta.index(self.name)
+    
+        if isinstance(index, int):
+            return get(index, c)
+            
+        if isinstance(index, slice):
+            start, stop, step = index.indices(len(dta))
+            index = range(start, stop, step)
+        elif not isinstance(index, collections.Iterable):
+            raise TypeError("index must be slice, iterable, or int")
+        
+        return [get(i, c) for i in index]
+        
+    def __str__(self):
+        return "variable {} of {}".format(self.name, self.dta_obj)
+            
+    def __abs__(self):
+        dta = self.dta_obj
+        get = dta.get
+        c = dta.index(self.name)
+        return DtaVarVals([abs(get(r,c)) for r in range(len(dta))])
+        
+    def __add__(self, other):
+        dta = self.dta_obj
+        get = dta.get
+        c = dta.index(self.name)
+        if isinstance(other, collections.Iterable):
+            return DtaVarVals([get(r,c) + other[r] for r in range(len(dta))])
+        return DtaVarVals([get(r,c) + other for r in range(len(dta))])
+        
+    def __bool__(self):
+        dta = self.dta_obj
+        get = dta.get
+        c = dta.index(self.name)
+        return DtaVarVals([bool(get(r,c)) for r in range(len(dta))])
+        
+    def __eq__(self, other):
+        dta = self.dta_obj
+        get = dta.get
+        c = dta.index(self.name)
+        if isinstance(other, collections.Iterable):
+            return DtaVarVals([get(r,c) == other[r] for r in range(len(dta))])
+        return DtaVarVals([get(r,c) == other for r in range(len(dta))])
+        
+    def __float__(self, other):
+        dta = self.dta_obj
+        get = dta.get
+        c = dta.index(self.name)
+        return DtaVarVals([float(get(r,c)) for r in range(len(dta))])
+        
+    def __floordiv__(self, other):
+        dta = self.dta_obj
+        get = dta.get
+        c = dta.index(self.name)
+        if isinstance(other, collections.Iterable):
+            return DtaVarVals([get(r,c) // other[r] for r in range(len(dta))])
+        return DtaVarVals([get(r,c) // other for r in range(len(dta))])
+        
+    def __ge__(self, other):
+        dta = self.dta_obj
+        get = dta.get
+        c = dta.index(self.name)
+        if isinstance(other, collections.Iterable):
+            return DtaVarVals([get(r,c) >= other[r] for r in range(len(dta))])
+        return DtaVarVals([get(r,c) >= other for r in range(len(dta))])
+        
+    def __gt__(self, other):
+        dta = self.dta_obj
+        get = dta.get
+        c = dta.index(self.name)
+        if isinstance(other, collections.Iterable):
+            return DtaVarVals([get(r,c) > other[r] for r in range(len(dta))])
+        return DtaVarVals([get(r,c) > other for r in range(len(dta))])
+        
+    def __iadd__(self, other):
+        dta = self.dta_obj
+        get = dta.get
+        c = dta.index(self.name)
+        if isinstance(other, collections.Iterable):
+            values = [get(r, c) + other[r] for r in range(len(dta))]
+        else:
+            values = [get(r, c) + other for r in range(len(dta))]
+        
+        dta[:, c] = values
+            
+        return self
+        
+    def __ifloordiv__(self, other):
+        dta = self.dta_obj
+        get = dta.get
+        c = dta.index(self.name)
+        if isinstance(other, collections.Iterable):
+            values = [get(r,c) // other[r] for r in range(len(dta))]
+        else:
+            values = [get(r,c) // other for r in range(len(dta))]
+        
+        dta[:, c] = values
+            
+        return self
+        
+    def __imod__(self, other):
+        dta = self.dta_obj
+        get = dta.get
+        c = dta.index(self.name)
+        if isinstance(other, collections.Iterable):
+            values = [get(r,c) % other[r] for r in range(len(dta))]
+        else:
+            values = [get(r,c) % other for r in range(len(dta))]
+        
+        dta[:, c] = values
+            
+        return self
+        
+    def __imul__(self, other):
+        dta = self.dta_obj
+        get = dta.get
+        c = dta.index(self.name)
+        if isinstance(other, collections.Iterable):
+            values = [get(r,c) * other[r] for r in range(len(dta))]
+        else:
+            values = [get(r,c) * other for r in range(len(dta))]
+        
+        dta[:, c] = values
+            
+        return self
+        
+    def __int__(self):
+        dta = self.dta_obj
+        get = dta.get
+        c = dta.index(self.name)
+        return DtaVarVals([int(get(r,c)) for r in range(len(dta))])
+        
+    def __ipow__(self, other):
+        dta = self.dta_obj
+        get = dta.get
+        c = dta.index(self.name)
+        if isinstance(other, collections.Iterable):
+            values = [get(r,c) ** other[r] for r in range(len(dta))]
+        else:
+            values = [get(r,c) ** other for r in range(len(dta))]
+        
+        dta[:, c] = values
+            
+        return self
+        
+    def __isub__(self, other):
+        dta = self.dta_obj
+        get = dta.get
+        c = dta.index(self.name)
+        if isinstance(other, collections.Iterable):
+            values = [get(r,c) - other[r] for r in range(len(dta))]
+        else:
+            values = [get(r,c) - other for r in range(len(dta))]
+        
+        dta[:, c] = values
+            
+        return self
+        
+    def __iter__(self):
+        dta = self.dta_obj
+        get = dta.get
+        c = dta.index(self.name)
+        for r in range(len(dta)):
+            yield get(r, c)
+        
+    def __itruediv__(self, other):
+        dta = self.dta_obj
+        get = dta.get
+        c = dta.index(self.name)
+        if isinstance(other, collections.Iterable):
+            values = [get(r,c) / other[r] for r in range(len(dta))]
+        else:
+            values = [get(r,c) / other for r in range(len(dta))]
+        
+        dta[:, c] = values
+            
+        return self
+        
+    def __le__(self, other):
+        dta = self.dta_obj
+        get = dta.get
+        c = dta.index(self.name)
+        if isinstance(other, collections.Iterable):
+            return DtaVarVals([get(r,c) <= other[r] for r in range(len(dta))])
+        return DtaVarVals([get(r,c) <= other for r in range(len(dta))])
+        
+    def __lt__(self, other):
+        dta = self.dta_obj
+        get = dta.get
+        c = dta.index(self.name)
+        if isinstance(other, collections.Iterable):
+            return DtaVarVals([get(r,c) < other[r] for r in range(len(dta))])
+        return DtaVarVals([get(r,c) < other for r in range(len(dta))])
+        
+    def __mod__(self, other):
+        dta = self.dta_obj
+        get = dta.get
+        c = dta.index(self.name)
+        if isinstance(other, collections.Iterable):
+            return DtaVarVals([get(r,c) % other[r] for r in range(len(dta))])
+        return DtaVarVals([get(r,c) % other for r in range(len(dta))])
+        
+    def __mul__(self, other):
+        dta = self.dta_obj
+        get = dta.get
+        c = dta.index(self.name)
+        if isinstance(other, collections.Iterable):
+            return DtaVarVals([get(r,c) * other[r] for r in range(len(dta))])
+        return DtaVarVals([get(r,c) * other for r in range(len(dta))])
+        
+    def __ne__(self, other):
+        dta = self.dta_obj
+        get = dta.get
+        c = dta.index(self.name)
+        if isinstance(other, collections.Iterable):
+            return DtaVarVals([get(r,c) != other[r] for r in range(len(dta))])
+        return DtaVarVals([get(r,c) != other for r in range(len(dta))])
+        
+    def __neg__(self):
+        dta = self.dta_obj
+        get = dta.get
+        c = dta.index(self.name)
+        return DtaVarVals([-get(r,c) for r in range(len(dta))])
+        
+    def __pos__(self):
+        dta = self.dta_obj
+        get = dta.get
+        c = dta.index(self.name)
+        return DtaVarVals([+get(r,c) for r in range(len(dta))])
+        
+    def __pow__(self, other):
+        dta = self.dta_obj
+        get = dta.get
+        c = dta.index(self.name)
+        if isinstance(other, collections.Iterable):
+            return DtaVarVals([get(r,c) ** other[r] for r in range(len(dta))])
+        return DtaVarVals([get(r,c) ** other for r in range(len(dta))])
+        
+    def __radd__(self, other):
+        dta = self.dta_obj
+        get = dta.get
+        c = dta.index(self.name)
+        if isinstance(other, collections.Iterable):
+            return DtaVarVals([other[r] + get(r,c) for r in range(len(dta))])
+        return DtaVarVals([other + get(r,c) for r in range(len(dta))])
+        
+    def __rfloordiv__(self, other):
+        dta = self.dta_obj
+        get = dta.get
+        c = dta.index(self.name)
+        if isinstance(other, collections.Iterable):
+            return DtaVarVals([other[r] // get(r,c) for r in range(len(dta))])
+        return DtaVarVals([other // get(r,c) for r in range(len(dta))])
+        
+    def __rmod__(self, other):
+        dta = self.dta_obj
+        get = dta.get
+        c = dta.index(self.name)
+        if isinstance(other, collections.Iterable):
+            return DtaVarVals([other[r] % get(r,c) for r in range(len(dta))])
+        return DtaVarVals([other % get(r,c) for r in range(len(dta))])
+        
+    def __rmul__(self, other):
+        dta = self.dta_obj
+        get = dta.get
+        c = dta.index(self.name)
+        if isinstance(other, collections.Iterable):
+            return DtaVarVals([other[r] * get(r,c) for r in range(len(dta))])
+        return DtaVarVals([other * get(r,c) for r in range(len(dta))])
+        
+    def __round__(self, n=None):
+        dta = self.dta_obj
+        get = dta.get
+        c = dta.index(self.name)
+        return DtaVarVals([round(get(r,c), n) for r in range(len(dta))])
+        
+    def __rpow__(self, other):
+        dta = self.dta_obj
+        get = dta.get
+        c = dta.index(self.name)
+        if isinstance(other, collections.Iterable):
+            return DtaVarVals([other[r] - get(r,c) for r in range(len(dta))])
+        return DtaVarVals([other - get(r,c) for r in range(len(dta))])
+        
+    def __rsub__(self, other):
+        dta = self.dta_obj
+        get = dta.get
+        c = dta.index(self.name)
+        if isinstance(other, collections.Iterable):
+            return DtaVarVals([other[r] - get(r,c) for r in range(len(dta))])
+        return DtaVarVals([other - get(r,c) for r in range(len(dta))])
+        
+    def __rtruediv__(self, other):
+        dta = self.dta_obj
+        get = dta.get
+        c = dta.index(self.name)
+        if isinstance(other, collections.Iterable):
+            return DtaVarVals([other[r] / get(r,c) for r in range(len(dta))])
+        return DtaVarVals([other / get(r,c) for r in range(len(dta))])
+        
+    def __sub__(self, other):
+        dta = self.dta_obj
+        get = dta.get
+        c = dta.index(self.name)
+        if isinstance(other, collections.Iterable):
+            return DtaVarVals([get(r,c) - other[r] for r in range(len(dta))])
+        return DtaVarVals([get(r,c) - other for r in range(len(dta))])
+        
+    def __truediv__(self, other):
+        dta = self.dta_obj
+        get = dta.get
+        c = dta.index(self.name)
+        if isinstance(other, collections.Iterable):
+            return DtaVarVals([get(r,c) / other[r] for r in range(len(dta))])
+        return DtaVarVals([get(r,c) / other for r in range(len(dta))])
+    
 
 class Dta():
     """A Python parent class for Stata datasets. 
@@ -259,6 +773,44 @@ class Dta():
         # display data label, if any
         if self._data_label.strip() != "":
             print("(" + self._data_label + ")")
+            
+    def __getattr__(self, name):
+        """Provides shortcut to Dta variables by appending "_".
+        Raises AttributeError if name does not end with "_".
+        Tries to find variable and return DtaVariable otherwise.
+        """
+        if not name.endswith("_"):
+            msg = "'{}' object has no attribute '{}'"
+            raise AttributeError(msg.format(self.__class__.__name__, name))
+            
+        varname = self._find_vars((name[:-1],))[0]
+        
+        return DtaVariable(self, varname, self._varlist.index(varname))
+        
+    def __setattr__(self, name, value):
+        """Provides shortcut to Dta variables by appending "_".
+        Creates or replaces variable if name ends with "_".
+        Creates or replaces regular attribute otherwise.
+        """
+        if not name.endswith("_"):
+            self.__dict__[name] = value
+        else:
+            varname = name[:-1]
+            if varname in self._varlist:
+                self[:, self._varlist.index(varname)] = value
+            else:
+                self.append_var(varname, value)
+        
+    def __delattr__(self, name):
+        """Provides shortcut to Dta variables by appending "_".
+        Raises AttributeError if name does not end with "_".
+        Otherwise, tries to find variable and drop it.
+        """
+        if not name.endswith("_"):
+            msg = "'{}' object has no attribute '{}'"
+            raise AttributeError(msg.format(self.__class__.__name__, name))
+        
+        self.drop_var(name[:-1])
         
     def save(self, address=None, replace=False):
         """Save current Dta object as dta file.
@@ -3467,6 +4019,9 @@ class Dta():
             return slice(start, stop, step)
         msg = "column should be index (int), name (str), slice, or iterable"
         raise TypeError(msg)
+        
+    def get(self, row, col):
+        return self._varvals[row][col]
             
     def __getitem__(self, index):
         """return Dta object containing obs 
