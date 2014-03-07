@@ -53,6 +53,26 @@ class DtaParseError(Exception):
 
     
 class DtaVarVals():
+    """A class for intermediate values when calculating with data
+    variables within a Dta object. Variables themselves are referenced
+    through an instance of DtaVariable. 
+    
+    This class is meant for internal use.
+    
+    Example
+    -------    
+    A user can create or replace a data variable called "target" with
+    
+        dta.target_ = dta.input1_ - 2 * dta.input2_
+    
+    When "dta.input1_" and "dta.input2_" attributes are looked up,
+    instances of DtaVariable are returned (assuming variables "input1"
+    and "input2" exist). The calculation on the right hand side results
+    in an instance of DtaVarVals holding the calculated values. The 
+    assignment statement replaces values if the variable exists, or
+    adds a new variable to the dataset.
+    
+    """
     def __init__(self, values):
         self.values = values
     
@@ -239,6 +259,16 @@ class DtaVarVals():
         
     
 class DtaVariable(DtaVarVals):
+    """A class for referencing a data variable within a Dta object.
+    Class instances are created when the user accesses a variable with
+    "dta.varname_", where "varname" is the full variable name or an
+    unambiguous abbreviation. Anything property ending with a single
+    underscore is assumed to be a reference to a variable.
+    
+    This class is meant for internal use.
+    
+    """
+
     def __init__(self, dta_obj, name, index):
         self.dta_obj = dta_obj
         self.name = name
@@ -529,11 +559,13 @@ class Dta():
         Raises AttributeError if name does not end with "_".
         Otherwise, tries to find variable and drop it.
         """
-        if not name.endswith("_"):
-            msg = "'{}' object has no attribute '{}'"
-            raise AttributeError(msg.format(self.__class__.__name__, name))
-        
-        self.drop_var(name[:-1])
+        if name.endswith("_"):
+            self.drop_var(name[:-1])
+        else:
+            if name not in self.__dict__:
+                msg = "'{}' object has no attribute '{}'"
+                raise AttributeError(msg.format(self.__class__.__name__, name))
+            del self.__dict__[name]
         
     def save(self, address=None, replace=False):
         """Save current Dta object as dta file.
