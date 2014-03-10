@@ -269,46 +269,46 @@ class DtaVariable(DtaVarVals):
     
     """
 
-    def __init__(self, dta_obj, name, index):
-        self.dta_obj = dta_obj
+    def __init__(self, source, name):
+        self.source = source
         self.name = name
         
     @property
     def values(self):
-        dta = self.dta_obj
-        get = dta.get
-        c = dta.index(self.name)
-        return (get(r,c) for r in range(len(dta)))
+        src = self.source
+        get = src.get
+        c = src.index(self.name)
+        return (get(r,c) for r in range(len(src)))
         
     def __iter__(self):
-        dta = self.dta_obj
-        get = dta.get
-        c = dta.index(self.name)
-        for r in range(len(dta)):
+        src = self.source
+        get = src.get
+        c = src.index(self.name)
+        for r in range(len(src)):
             yield get(r, c)
         
     def __setattr__(self, name, value):
         if name == "values":
-            dta = self.dta_obj
-            c = dta.index(self.name)
-            dta[:, c] = value
+            src = self.source
+            c = src.index(self.name)
+            src[:, c] = value
         else:
             self.__dict__[name] = value
     
     def __setitem__(self, index, value):
-        dta = self.dta_obj
-        dta[index, dta.index(self.name)] = value
+        src = self.source
+        src[index, src.index(self.name)] = value
         
     def __getitem__(self, index):
-        dta = self.dta_obj
-        get = dta.get
-        c = dta.index(self.name)
+        src = self.source
+        get = src.get
+        c = src.index(self.name)
     
         if isinstance(index, int):
             return get(index, c)
             
         if isinstance(index, slice):
-            start, stop, step = index.indices(len(dta))
+            start, stop, step = index.indices(len(src))
             index = range(start, stop, step)
         elif not isinstance(index, collections.Iterable):
             raise TypeError("index must be slice, iterable, or int")
@@ -316,7 +316,7 @@ class DtaVariable(DtaVarVals):
         return [get(i, c) for i in index]
         
     def __str__(self):
-        return "variable {} of {}".format(self.name, self.dta_obj)
+        return "variable {} of {}".format(self.name, self.source)
     
 
 class Dta():
@@ -538,7 +538,7 @@ class Dta():
             
         varname = self._find_vars((name[:-1],))[0]
         
-        return DtaVariable(self, varname, self._varlist.index(varname))
+        return DtaVariable(self, varname)
         
     def __setattr__(self, name, value):
         """Provides shortcut to Dta variables by appending "_".
