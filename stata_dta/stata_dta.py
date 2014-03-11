@@ -9,8 +9,9 @@ import re
 import copy
 import sys
 
-from .stata_missing import (get_missing, MissingValue,
-                            MISSING, MISSING_VALS)
+from .stata_missing import (
+    get_missing, MissingValue, MISSING, MISSING_VALS
+)
 
 try:
     from stata import st_format
@@ -95,7 +96,10 @@ class DtaVarVals():
         
     def __eq__(self, other):
         if isinstance(other, collections.Iterable):
-            return DtaVarVals([v == o for (v,o) in zip(self.values, other)])
+            values = self.values
+            return DtaVarVals(
+                [values[i] == other[i] for i in range(len(self))]
+            )
         return DtaVarVals([v == other for v in self.values])
         
     def __float__(self, other):
@@ -177,6 +181,9 @@ class DtaVarVals():
         if isinstance(other, collections.Iterable):
             return DtaVarVals([v <= o for (v,o) in zip(self.values, other)])
         return DtaVarVals([v <= other for v in self.values])
+        
+    def __len__(self):
+        return len(self.values)
         
     def __lt__(self, other):
         if isinstance(other, collections.Iterable):
@@ -278,7 +285,7 @@ class DtaVariable(DtaVarVals):
         src = self.source
         get = src.get
         c = src.index(self.name)
-        return (get(r,c) for r in range(len(src)))
+        return [get(r,c) for r in range(len(src))]
         
     def __iter__(self):
         src = self.source
@@ -314,6 +321,9 @@ class DtaVariable(DtaVarVals):
             raise TypeError("index must be slice, iterable, or int")
         
         return [get(i, c) for i in index]
+        
+    def __len__(self):
+        return len(self.source)
         
     def __str__(self):
         return "variable {} of {}".format(self.name, self.source)
