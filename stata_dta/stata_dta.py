@@ -453,14 +453,16 @@ class Dta():
         
         first_arg = args[0]
         if isinstance(first_arg, str):
-            if nargs > 1:
+            if nargs > 2 or (nargs > 1 and "quiet" not in kwargs):
                 raise TypeError(
-                    "only one argument allowed when creating Dta from file")
+                    "incorrect arguments for creating Dta from file"
+                )
             self._new_from_file(*args, **kwargs)
         elif isinstance(first_arg, Dta):
             if nargs > 3:
                 raise TypeError(
-                    "too many arguments to create Dta from existing Dta")
+                    "too many arguments to create Dta from existing Dta"
+                )
             self._new_from_dta(*args, **kwargs)
         elif isinstance(first_arg, collections.Iterable):
             self._new_from_iter(*args, **kwargs)
@@ -471,6 +473,8 @@ class Dta():
         """create data object by subscripting another data object"""
         sel_rows = sel_rows if sel_rows is not None else range(old_dta._nobs)
         sel_cols = sel_cols if sel_cols is not None else range(old_dta._nvar)
+        
+        self._quiet = old_dta._quiet
         
         #header
         self._ds_format  = old_dta._ds_format
@@ -510,7 +514,7 @@ class Dta():
         if not isinstance(self, old_type):
             self._convert_dta(old_type)
     
-    def _new_from_file(self, address):
+    def _new_from_file(self, address, quiet=False):
         """get data object from file"""
         address = self._get_fullpath(address)
         
@@ -536,6 +540,9 @@ class Dta():
         # display data label, if any
         if self._data_label.strip() != "":
             print("(" + self._data_label + ")")
+            
+        # set quiet on or off
+        self._quiet = bool(quiet)
             
     def __getattr__(self, name):
         """Provides shortcut to Dta variables by appending "_".
@@ -658,6 +665,27 @@ class Dta():
         """
         return (item is None or isinstance(item, MissingValue) 
                 or not (SMALLEST_NONMISSING <= item <= LARGEST_NONMISSING))
+                
+    def quiet(self, q=True):
+        """Allow or disallow output messages.
+        
+        Parameters
+        ----------
+        q : bool or coercible to bool
+            Default value is True, meaning disallow messages.
+        
+        Returns
+        -------
+        None
+        
+        Notes
+        -----
+        Methods that are primarily designed for output--like `describe`,
+        `list`, and `summary`--will show output regardless. Setting this
+        function affects warnings or other 'unexpected' messages.
+        
+        """
+        self._quiet = bool(q)
         
     def to_list(self):
         """Return list of data observations.
@@ -714,8 +742,10 @@ class Dta():
         if not empty_ok and nnames == 0:
             raise ValueError("no variables specified")
         if single and nnames > 1:
-            msg = "{{err}}only one {}varname allowed; ignoring the rest"
-            print(msg.format('e' if evars else ''))
+            if not self._quiet:
+                smcl = "{err}" if IN_STATA else ""
+                msg = smcl + "only one {}varname allowed; ignoring the rest"
+                print(msg.format('e' if evars else ''))
             split_names = split_names[:1]
     
         # if all_specified, return aleady-constructed all_names
@@ -1837,7 +1867,7 @@ class Dta():
             if wt_type == 'f' and not self._isintvar(wt_index):
                 raise TypeError("frequency weights must be integer")        
                 
-            if wt_type == 'a' and weight is not None:
+            if wt_type == 'a' and weight is not None and not self._quiet:
                 if IN_STATA: print("{txt}(analytic weights assumed)")
                 else: print("(analytic weights assumed)")
         else:
@@ -2654,8 +2684,7 @@ class Dta():
             if (evarname not in self._chrdict 
                   or 'note0' not in self._chrdict[evarname] 
                   or 'note' + str(in_) not in self._chrdict[evarname]):
-                print("  (no note replaced)")
-                return
+                raise ValueError("note not found; could not be replaced")
                 
         if evarname not in self._chrdict:
             self._chrdict[evarname] = {}
@@ -2957,10 +2986,11 @@ class Dta():
         if not isinstance(label, str):
             raise TypeError("data label should be a string")
         if len(label) > 80:
-            if IN_STATA:
-                print("{err}truncating label to 80 characters")
-            else:
-                print("truncating label to 80 characters")
+            if not self._quiet:
+                if IN_STATA:
+                    print("{err}truncating label to 80 characters")
+                else:
+                    print("truncating label to 80 characters")
             label = label[:80]
         if self._data_label == label:
             return
@@ -3239,9 +3269,8 @@ class Dta():
                 # Create copy of keys. Otherwise, set of keys changes.
                 labnames = set(vallabs.keys()) 
             else:
-                print("{err}nothing to do; " + 
-                      "no labels specified and drop_all==False")
-                return
+                msg = "must specify label name(s) or drop_all==True"
+                raise ValueError(msg)
         else:
             if isinstance(labnames, str):
                 labnames = (labnames,)
@@ -3361,8 +3390,9 @@ class Dta():
             lbllist = self._lbllist
             
             curr_lang = langs[0]
-            msg = "{{txt}}(language {} now current language)".format(curr_lang)
-            print(msg)
+            if not self._quiet:
+                msg = "{}(language {} now current language)"
+                print(msg.format("{txt}" if IN_STATA else "", curr_lang))
             
             varlab_key = "_lang_v_" + curr_lang
             vallab_key = "_lang_l_" + curr_lang
@@ -3619,7 +3649,7 @@ class Dta():
         Creates, deletes, renames, or swaps label languages/groups.
         
         """
-        in_stata = IN_STATA
+        global IN_STATA
         
         curr_lang, langs, nlangs = self._get_language_info()
         
@@ -3630,7 +3660,7 @@ class Dta():
             if noptions != 0:
                 msg = "options cannot be used without language name"
                 raise ValueError(msg)
-            if in_stata:
+            if IN_STATA:
                 self._label_language_list_smcl(nlangs, langs, curr_lang)
             else:
                 self._label_language_list_nosmcl(nlangs, langs, curr_lang)
@@ -3647,10 +3677,11 @@ class Dta():
         if not isinstance(languagename, str):
             raise TypeError("given language name must be str")
         if len(languagename) > 24:
-            if in_stata:
-                print("{err}shortening language name to 24 characters")
-            else:
-                print("shortening language name to 24 characters")
+            if not self._quiet:
+                if IN_STATA:
+                    print("{err}shortening language name to 24 characters")
+                else:
+                    print("shortening language name to 24 characters")
             languagename = languagename[:24]
         
         name_exists = languagename in langs
@@ -3661,12 +3692,9 @@ class Dta():
                 msg = "language {} not defined".format(languagename)
                 raise ValueError(msg)
             if languagename == curr_lang:
-                if in_stata:
-                    print(
-                        ("{txt}",
-                        "({} already current language)".format(curr_lang)))
-                else:
-                    print("({} already current language)".format(curr_lang))
+                if not self._quiet:
+                    msg = "{}({} already current language)"
+                    print(msg.format("{txt}" if IN_STATA else "", curr_lang))
             else:
                 self._label_language_swap(languagename, curr_lang)
             return
@@ -3709,9 +3737,9 @@ class Dta():
         self._put_labels_in_chr(languagename, langs, curr_lang)
         if copy:
             # use current labels
-            msg = "(language {} now current language)".format(languagename)
-            smcl = "{txt}" if in_stata else ""
-            print("".join((smcl, msg)))
+            if not self._quiet:
+                msg = "{}(language {} now current language)"
+                print(msg.format("{txt}" if IN_STATA else "", languagename))
         else:
             # empty current labels
             nvar = self._nvar
@@ -4601,7 +4629,8 @@ class Dta():
     def _convert_dta(self, old_type):
         raise NotImplementedError
     
-    def _new_from_iter(self, varvals, compress=True, single_row=False):
+    def _new_from_iter(self, varvals, compress=True,
+                       single_row=False, quiet=False):
         raise NotImplementedError
         
     def append_var(self, name, values, st_type=None, compress=True):
@@ -4691,7 +4720,9 @@ class Dta115(Dta):
                 if st_type == 32768:
                     if not seen_strl:
                         seen_strl = True
-                        print("{err}warning: strLs converted to strfs")
+                        if not self._quiet:
+                            msg = "warning: strLs converted to strfs"
+                            print(("{err}" if IN_STATA else "") + msg)
                     str_len = 0
                     for i in range(nobs):
                         new_val = str(varvals[i][j])
@@ -4699,7 +4730,9 @@ class Dta115(Dta):
                         if val_len > 244:
                             if not seen_long_str:
                                 seen_long_str = True
-                                print("{err}warning: long strings truncated")
+                                if not self._quiet:
+                                    msg = "warning: long strings truncated"
+                                    print(("{err}" if IN_STATA else "") + msg)
                             new_val = new_val[:244]
                             val_len = 244
                         varvals[i][j] = new_val
@@ -4714,7 +4747,9 @@ class Dta115(Dta):
                 elif 245 < st_type <= 2045:
                     if not seen_long_str:
                         seen_long_str = True
-                        print("{err}warning: long strings truncated")
+                        if not self._quiet:
+                            msg = "warning: long strings truncated"
+                            print(("{err}" if IN_STATA else "") + msg)
                     str_len = 0
                     for i in range(nobs):
                         new_val = varvals[i][j]
@@ -4735,9 +4770,12 @@ class Dta115(Dta):
                 elif not seen_strange:
                     # just a safety; not needed in normal usage
                     seen_strange = True
-                    print("{err}strange Stata types encountered; ignoring")
+                    if not self._quiet:
+                        msg = "strange Stata types encountered; ignoring"
+                        print(("{err}" if IN_STATA else "") + msg)
         
-    def _new_from_iter(self, varvals, compress=True, single_row=False):
+    def _new_from_iter(self, varvals, compress=True,
+                       single_row=False, quiet=False):
         """create dataset from iterable of values"""
         global get_missing
         
@@ -4882,12 +4920,13 @@ class Dta115(Dta):
                             # Stata sets value to missing, 
                             # does not promote float to double.
         
-        smcl = "{err}" if IN_STATA else ""
-        if str_clipped:
-            msg = "warning: some strings were shortened to 244 characters"
-            print(smcl + msg)
-        if alt_missing:
-            print(smcl + "warning: some missing values inserted")
+        if not quiet:
+            smcl = "{err}" if IN_STATA else ""
+            if str_clipped:
+                msg = "warning: some strings were shortened to 244 characters"
+                print(smcl + msg)
+            if alt_missing:
+                print(smcl + "warning: some missing values inserted")
             
         # header
         self._ds_format  = 115
@@ -4921,6 +4960,9 @@ class Dta115(Dta):
         
         # set changed to True, since new dataset has not been saved
         self._changed = True
+        
+        # set quiet on or off
+        self._quiet = bool(quiet)
         
     def append_var(self, name, values, st_type=None, compress=True):
         """Add new variable to data set.
@@ -4981,8 +5023,8 @@ class Dta115(Dta):
             if re.match(r'^str[0-9]+$', st_type):
                 st_type = int(st_type[3:])
                 if st_type > 244:
-                    msg = "{err}given string type too large; shortening to 244"
-                    print(msg)
+                    msg = "given string type too large; shortening to 244"
+                    print(("{err}" if IN_STATA else "") + msg)
                     st_type = 244
                     init_st_type = st_type
             elif st_type in type_names:
@@ -5106,17 +5148,18 @@ class Dta115(Dta):
             for row, new_val in zip(varvals, values):
                 row.append(new_val)
             
-            smcl = "{err}" if IN_STATA else ""
-            if init_st_type is not None and init_st_type != st_type:
-                st_type_name = self._get_type_name(st_type)
-                msg = (smcl + "warning: some values were incompatible with " + 
-                       "specified type;\n    type changed to " + st_type_name)
-                print(msg)
-            if str_clipped:
-                print(smcl + "warning: some strings were " + 
-                      "shortened to 244 characters")
-            if alt_missing:
-                print(smcl + "warning: some missing values inserted")
+            if not self._quiet:
+                smcl = "{err}" if IN_STATA else ""
+                if init_st_type is not None and init_st_type != st_type:
+                    st_type_name = self._get_type_name(st_type)
+                    msg = (smcl + "warning: some values were incompatible with " + 
+                           "specified type;\n    type changed to " + st_type_name)
+                    print(msg)
+                if str_clipped:
+                    print(smcl + "warning: some strings were " + 
+                          "shortened to 244 characters")
+                if alt_missing:
+                    print(smcl + "warning: some missing values inserted")
             
         
         self._typlist.append(st_type)
@@ -5266,27 +5309,24 @@ class Dta115(Dta):
                             # does not promote float to double.
                 varvals[row_num][col_num] = val
         
-        seen_cols = set() # same column can appear multiple times
-        smcl = "{txt}" if IN_STATA else ""
-        for old_type,c in zip(old_typlist, sel_cols):
-            new_type = typlist[c]
-            if old_type != new_type and c not in seen_cols:
-                old_name = self._get_type_name(old_type)
-                new_name = self._get_type_name(new_type)
-                msg = (
-                    smcl,
-                    "Stata type for ",
-                    "{} was {}, now {}".format(varlist[c], old_name, new_name)
-                )
-                print("".join(msg))
-            seen_cols.add(c)
-        
-        smcl = "{err}" if IN_STATA else ""
-        if str_clipped:
-            msg = "warning: some strings were shortened to 244 characters"
-            print(smcl + msg)
-        if alt_missing:
-            print(smcl + "warning: some missing values inserted")
+        if not self._quiet:
+            seen_cols = set() # same column can appear multiple times
+            smcl = "{txt}" if IN_STATA else ""
+            msg = smcl + "Stata type for {} was {}, now {}"
+            for old_type,c in zip(old_typlist, sel_cols):
+                new_type = typlist[c]
+                if old_type != new_type and c not in seen_cols:
+                    old_name = self._get_type_name(old_type)
+                    new_name = self._get_type_name(new_type)
+                    print(msg.format(varlist[c], old_name, new_name))
+                seen_cols.add(c)
+            
+            smcl = "{err}" if IN_STATA else ""
+            if str_clipped:
+                msg = "warning: some strings were shortened to 244 characters"
+                print(smcl + msg)
+            if alt_missing:
+                print(smcl + "warning: some missing values inserted")
         
     def _missing_save_val(self, miss_val, st_type):
         """helper function for writing dta files"""
@@ -5510,7 +5550,8 @@ class Dta117(Dta):
         self._typlist = [i if i <= 244 else 65530 + (251 - i) 
                          for i in self._typlist]
         
-    def _new_from_iter(self, varvals, compress=True, single_row=False):
+    def _new_from_iter(self, varvals, compress=True,
+                       single_row=False, quiet=False):
         """create dataset from iterable of values"""
         global get_missing
         
@@ -5676,9 +5717,10 @@ class Dta117(Dta):
                             # Stata sets value to missing, 
                             # does not promote float to double.
         
-        smcl = "{err}" if IN_STATA else ""        
-        if alt_missing:
-            print(smcl + "warning: some missing values inserted")
+        if not quiet:
+            if alt_missing:
+                smcl = "{err}" if IN_STATA else "" 
+                print(smcl + "warning: some missing values inserted")
             
         # header
         self._ds_format  = 117
@@ -5713,6 +5755,9 @@ class Dta117(Dta):
         
         # set changed to True, since new dataset has not been saved
         self._changed = True
+        
+        # set quiet on or off
+        self._quiet = bool(quiet)
         
     def append_var(self, name, values, st_type=None, compress=True):
         """Add new variable to data set.
@@ -5777,7 +5822,8 @@ class Dta117(Dta):
                 else:
                     st_type = int(m.group(1)) 
                     if st_type > 2045:
-                        print("string type > 2045; appending as strL")
+                        if not self._quiet:
+                            print("string type > 2045; appending as strL")
                         st_type = 32768
                 init_st_type = st_type
             elif st_type in type_names:
@@ -5920,14 +5966,15 @@ class Dta117(Dta):
             for row, new_val in zip(varvals, values):
                 row.append(new_val)
             
-            smcl = "{err}" if IN_STATA else ""
-            if init_st_type is not None and init_st_type != st_type:
-                st_type_name = self._get_type_name(st_type)
-                msg = ("warning: some values were incompatible with " + 
-                       "specified type;\n    type changed to " + st_type_name)
-                print(smcl + msg)
-            if alt_missing:
-                print(smcl + "warning: some missing values inserted")
+            if not self._quiet:
+                smcl = "{err}" if IN_STATA else ""
+                if init_st_type is not None and init_st_type != st_type:
+                    st_type_name = self._get_type_name(st_type)
+                    msg = ("warning: some values were incompatible with " + 
+                           "specified type;\n    type changed to " + st_type_name)
+                    print(smcl + msg)
+                if alt_missing:
+                    print(smcl + "warning: some missing values inserted")
             
         
         self._typlist.append(st_type)
@@ -6090,27 +6137,24 @@ class Dta117(Dta):
                             # does not promote float to double.
                             
                 varvals[row_num][col_num] = val
-                
-        # Record seen columns. 
-        # Use a set because same column can appear multiple times.
-        seen_cols = set()
-        smcl = "{txt}" if IN_STATA else ""
-        for old_type,c in zip(old_typlist, sel_cols):
-            new_type = typlist[c]
-            if old_type != new_type and c not in seen_cols:
-                old_name = self._get_type_name(old_type)
-                new_name = self._get_type_name(new_type)
-                msg = (
-                    smcl,
-                    "Stata type for ",
-                    "{} was {}, now {}".format(varlist[c], old_name, new_name)
-                )
-                print("".join(msg))
-            seen_cols.add(c)
-        
-        smcl = "{err}" if IN_STATA else ""
-        if alt_missing:
-            print(smcl + "warning: some missing values inserted")
+            
+        if not self._quiet: 
+            # Record seen columns. 
+            # Use a set because same column can appear multiple times.
+            seen_cols = set()
+            smcl = "{txt}" if IN_STATA else ""
+            msg = smcl + "Stata type for {} was {}, now {}"
+            for old_type,c in zip(old_typlist, sel_cols):
+                new_type = typlist[c]
+                if old_type != new_type and c not in seen_cols:
+                    old_name = self._get_type_name(old_type)
+                    new_name = self._get_type_name(new_type)
+                    print(msg.format(varlist[c], old_name, new_name))
+                seen_cols.add(c)
+            
+            smcl = "{err}" if IN_STATA else ""
+            if alt_missing:
+                print(smcl + "warning: some missing values inserted")
         
     def _missing_save_val(self, miss_val, st_type):
         """helper function for writing dta files"""
@@ -6634,6 +6678,6 @@ def open_dta(address):
     elif first_bytes.decode('iso-8859-1') == "<stata_dta>":
         return Dta117(address)
     else:
-        print("only dta formats 117, 115, and 114 are supported")
+        raise ValueError("only dta formats 117, 115, and 114 are supported")
     
     
