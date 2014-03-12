@@ -102,7 +102,7 @@ class DtaVarVals():
             )
         return DtaVarVals([v == other for v in self.values])
         
-    def __float__(self, other):
+    def __float__(self):
         return DtaVarVals([float(v) for v in self.values])
         
     def __floordiv__(self, other):
