@@ -1,5 +1,5 @@
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 
 class MissingValue():
     """A class to mimic some of the properties of Stata's missing values.
@@ -84,9 +84,6 @@ class MissingValue():
     def __rdivmod__(self, other):
         return MISSING, MISSING
         
-    def __repr__(self):
-        return self.name
-        
     def __rfloordiv__(self, other):
         return MISSING
         
@@ -96,7 +93,7 @@ class MissingValue():
     def __rmul__(self, other):
         return MISSING
         
-    def __round__(self, nDigits=None):
+    def __round__(self, ndigits=None):
         return self
         
     def __rpow__(self, other):

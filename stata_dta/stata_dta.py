@@ -687,6 +687,10 @@ class Dta():
         """
         self._quiet = bool(q)
         
+    def __iter__(self):
+        for row in self._varvals:
+            yield row
+        
     def to_list(self):
         """Return list of data observations.
         
