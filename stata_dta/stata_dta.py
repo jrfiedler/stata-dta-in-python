@@ -3544,6 +3544,20 @@ class Dta():
         raise TypeError(msg)
         
     def get(self, row, col):
+        """Get single data value.
+        
+        Parameters
+        ----------
+        row : integer
+            Row (observation) number of data value.
+        col : integer
+            Column (data variable) number of data value.
+        
+        Returns
+        -------
+        string, numeric, missing value, or binary data value
+        
+        """
         return self._varvals[row][col]
             
     def __getitem__(self, index):

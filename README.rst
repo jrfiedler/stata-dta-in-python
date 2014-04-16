@@ -39,8 +39,9 @@ Changelog
 -----
 
 - Added quick access to data variables, as in `dta.varname_`
-- Added `stata_math` module, imitating Stata math functions
+- Added `stata_math` module provides functions that understand missing values and quick-access data variables
 - New method `quiet()` silences warnings and other 'unexpected' output
+- New method `get(row, col)` for getting a single data value
 
 See examples "Quick access to data variables" and "Math with missing values" in EXAMPLES.rst.
 
