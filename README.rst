@@ -14,7 +14,7 @@ Currently, this package supports .dta file formats 114, 115, and 117.
 Requirements
 ============
 
-Python 3.1, 3.2, or 3.3
+Python 3.1 - 3.4
 
 
 Installation

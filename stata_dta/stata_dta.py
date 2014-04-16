@@ -1849,7 +1849,7 @@ class Dta():
         if isinstance(val, MissingValue):
             aln = fmt_info[1][2]
             wid = str(fmt_info[2])
-            return "".join(("{:", aln, wid, "s}")).format(val)
+            return "".join(("{:", aln, wid, "s}")).format(str(val))
         
         fmt_type = fmt_info[0]
         decimal_comma = fmt_type in ('f', 'g', 'e') and fmt_info[3] is not None
