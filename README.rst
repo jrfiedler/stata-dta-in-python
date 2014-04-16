@@ -1,5 +1,6 @@
+###################
 Stata dta in Python
-===================
+###################
 
 This is a package for using Stata .dta files in Python. The main functionality of the package is in its ``Dta`` class and subclasses, which encapsulate the information from a .dta file, and provide methods for adding, replacing, or deleting this information. 
 
@@ -11,13 +12,13 @@ Currently, this package supports .dta file formats 114, 115, and 117.
 
 
 Requirements
-------------
+============
 
 Python 3.1, 3.2, or 3.3
 
 
 Installation
-------------
+============
 
 Download the package, either with::
 
@@ -31,9 +32,21 @@ Then, in the main folder, use::
 
 to install.
 
+Changelog
+=========
+
+0.2.0
+-----
+
+- Added quick access to data variables, as in `dta.varname_`
+- Added `stata_math` module, imitating Stata math functions
+- New method `quiet()` silences warnings and other 'unexpected' output
+
+See examples "Quick access to data variables" and "Math with missing values" in EXAMPLES.rst.
+
 
 Example usage
--------------
+=============
 
 ::
 
@@ -132,16 +145,16 @@ For more examples, see EXAMPLES.md.
 
 
 Contributors
-------------
+============
 - James Fiedler
 - Matthew Koslovsky
 
 
 Contact
--------
+=======
 James Fiedler, jrfiedler@gmail.com
 
 
 License
----------
+=======
 Copyright (c) 2013, James Fiedler (MIT License)

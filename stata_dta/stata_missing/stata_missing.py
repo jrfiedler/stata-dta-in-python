@@ -84,6 +84,9 @@ class MissingValue():
     def __rdivmod__(self, other):
         return MISSING, MISSING
         
+    def __repr__(self):
+        return self.name
+        
     def __rfloordiv__(self, other):
         return MISSING
         

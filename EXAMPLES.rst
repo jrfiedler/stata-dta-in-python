@@ -6,6 +6,8 @@ Contents
 - Creating Dta object from Python values
 - Saving Dta object to .dta file
 - Missing values
+- Quick access to data variables
+- Math with missing values
 - Subscripting
   - Data subsets
   - Assigning new values
@@ -177,6 +179,75 @@ As shown above, the submodule ``stata_missing`` implements analogs of Stata's mi
     >>> mvs[1], mvs[2], mvs[1] < mvs[2]
     (.a, .b, True)
 
+Quick access to data variables
+==============================
+
+You can access data variables quickly as an attribute of the `Dta` instance, with an underscore appended: `dta.varname_`. You can use abbreviate the variable names if the abbreviation is unambiguous.
+
+    >>> from stata_dta import Dta117
+    
+    >>> data = Dta117("C:/Program Files (x86)/Stata13/auto.dta")
+    (1978 Automobile Data)
+    
+    >>> data.mpg_[:10]
+    [22, 17, 22, 20, 15, 18, 26, 20, 16, 19]
+    
+    >>> data.gear_ratio_[:3]
+    [3.5799999237060547, 2.5299999713897705, 3.0799999237060547]
+    
+    >>> data.gear_[:3]
+    [3.5799999237060547, 2.5299999713897705, 3.0799999237060547]
+
+Math with missing values
+========================
+
+The usual binary math operations should work with missing values when the other operand is also missing or is numeric. Usually, the output will be the "." missing value.
+
+    >>> from stata_dta.stata_missing import MISSING_VALS as mvs
+    
+    >>> mvs[0] * mvs[1]
+    .
+    
+    >>> mvs[10]
+    .j
+    
+    >>> mvs[10] + 123.456
+    .
+
+Python math functions do not understand missing values, and don't know how to work with the quick-access data variables described in the last example.
+
+    >>> from math import sin
+    
+    >>> sin(mvs[0])
+    Traceback (most recent call last):
+      File "<stdin>", line 1, in <module>
+    TypeError: a float is required
+    
+    >>> from stata_dta import Dta117
+    
+    >>> data = Dta117("C:/Program Files (x86)/Stata13/auto.dta")
+    (1978 Automobile Data)
+    
+    >>> data.mpg_[:10]
+    [22, 17, 22, 20, 15, 18, 26, 20, 16, 19]
+    
+    >>> sin(data.mpg_)
+    Traceback (most recent call last):
+      File "<stdin>", line 1, in <module>
+    TypeError: nb_float should return float object
+
+When there may be missing values or when wanting to work with the quick-access data variables, use the `stata_math` submodule. It supports all of Stata's "math functions" (see -help math functions- <http://www.stata.com/help.cgi?math+functions>). Access these functions by prepending "st_" to the name of the function.
+
+    >>> from stata_dta.stata_math import st_sin
+    
+    >>> st_sin(mvs[10])
+    .
+    
+    >>> s = st_sin(data.mpg_)
+    
+    >>> s[:3]
+    [-0.008851309290403876, -0.9613974918795568, -0.008851309290403876]
+
 
 Subscripting
 ============
@@ -296,26 +367,27 @@ Aside from the functionality in the above examples, you can use ``dir(Dta117)`` 
 
     >>> public = [x for x in dir(Dta117) if not x.startswith("_")] + ["",""]
     >>> template = "  {:<16}{:<16}{:<16}"
-    >>> for i in range(0, len(public)-3, 3):
+    >>> for i in range(0, len(public), 3):
     ...     print(template.format(*public[i:i+3]))
     ...
       append_obs      append_var      check
       clonevar        copy            describe
       drop_obs        drop_var        drop_vars
-      format          index           ismissing
-      keep_obs        keep_var        keep_vars
-      label_copy      label_data      label_define
-      label_dir       label_drop      label_language
-      label_list      label_values    label_variable
-      list            note_add        note_drop
-      note_list       note_renumber   note_replace
-      note_search     notes_add       notes_drop
-      notes_list      notes_renumber  notes_replace
-      notes_search    order           rename
-      replace         return_list     save
-      set_obs         sort            summ
-      summarize       to_list         variable
-      width           xpose
+      format          get             index
+      ismissing       keep_obs        keep_var
+      keep_vars       label_copy      label_data
+      label_define    label_dir       label_drop
+      label_language  label_list      label_values
+      label_variable  list            note_add
+      note_drop       note_list       note_renumber
+      note_replace    note_search     notes_add
+      notes_drop      notes_list      notes_renumber
+      notes_replace   notes_search    order
+      quiet           rename          replace
+      return_list     save            set_obs
+      sort            summ            summarize
+      to_list         variable        width
+      xpose
     
     >>> help(Dta117.check)
     Help on function check in module stata_dta.stata_dta:

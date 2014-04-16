@@ -21,7 +21,7 @@ except ImportError:
     IN_STATA = False
 
 
-__version__ = '0.1.0'
+__version__ = '0.2.0'
 
 __all__ = ['Dta', 'Dta115', 'Dta117', 
            'display_diff', 'open_dta']
