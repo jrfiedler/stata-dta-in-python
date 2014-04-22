@@ -1,7 +1,6 @@
 stata_dta/__pycache__/
 stata_dta/stata_missing/__pycache__/
 stata_dta/tests/
-stata_dta/stata_math
 incomplete/
 build/
 *.pyc
