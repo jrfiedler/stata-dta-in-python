@@ -641,7 +641,7 @@ class Dta():
             lbllist = self._lbllist
             vlblist = self._vlblist
             
-            hline = "-" * 80
+            hline = "{txt}{hline}" if IN_STATA else "-" * 80
             print(hline)
             print("              storage   display    value")
             print("variable name   type    format     label      variable label")
