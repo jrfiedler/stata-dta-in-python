@@ -158,4 +158,4 @@ James Fiedler, jrfiedler@gmail.com
 
 License
 =======
-Copyright (c) 2013, James Fiedler (MIT License)
+Copyright (c) 2014, James Fiedler (MIT License)
