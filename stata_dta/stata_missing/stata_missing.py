@@ -17,7 +17,8 @@ class MissingValue():
         
         """
         self.value = float.fromhex(
-            "".join(('0x1.0', hex(index)[2:].zfill(2), 'p+1023')))
+            "".join(('0x1.0', hex(index)[2:].zfill(2), 'p+1023'))
+        )
         self.name = "." if index == 0 else "." + chr(index + 96)
         self.index = index
             

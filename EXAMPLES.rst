@@ -184,6 +184,8 @@ Quick access to data variables
 
 You can access data variables quickly as an attribute of the `Dta` instance, with an underscore appended: `dta.varname_`. You can use abbreviate the variable names if the abbreviation is unambiguous.
 
+::
+
     >>> from stata_dta import Dta117
     
     >>> data = Dta117("C:/Program Files (x86)/Stata13/auto.dta")
@@ -203,6 +205,8 @@ Math with missing values
 
 The usual binary math operations should work with missing values when the other operand is also missing or is numeric. Usually, the output will be the "." missing value.
 
+::
+
     >>> from stata_dta.stata_missing import MISSING_VALS as mvs
     
     >>> mvs[0] * mvs[1]
@@ -215,6 +219,8 @@ The usual binary math operations should work with missing values when the other 
     .
 
 Python math functions do not understand missing values, and don't know how to work with the quick-access data variables described in the last example.
+
+::
 
     >>> from math import sin
     
@@ -237,6 +243,8 @@ Python math functions do not understand missing values, and don't know how to wo
     TypeError: nb_float should return float object
 
 When there may be missing values or when wanting to work with the quick-access data variables, use the `stata_math` submodule. It supports all of Stata's "math functions" (see -help math functions- <http://www.stata.com/help.cgi?math+functions>). Access these functions by prepending "st_" to the name of the function.
+
+::
 
     >>> from stata_dta.stata_math import st_sin
     
