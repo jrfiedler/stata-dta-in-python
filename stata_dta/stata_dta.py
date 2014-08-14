@@ -249,12 +249,16 @@ class Dta():
         if version in (114, 115):
             self._file_to_Dta115(address)
             if not isinstance(self, Dta115):
-                print("file format is {}, converting to 117".format(version))
+                if not quiet:
+                    msg = "file format is {}, converting to 117"
+                    print(msg.format(version))
                 self._convert_dta(Dta115)
         else:
             self._file_to_Dta117(address)
             if not isinstance(self, Dta117):
-                print("file format is {}, converting to 115".format(version))
+                if not quiet:
+                    msg = "file format is {}, converting to 115"
+                    print(msg.format(version))
                 self._convert_dta(Dta117)
                 
         # set self's path and filename
@@ -263,9 +267,9 @@ class Dta():
         # set changed to False, since dataset comes directly from file
         self._changed = False
         
-        # display data label, if any
-        if self._data_label.strip() != "":
-            print("(" + self._data_label + ")")
+        # display data label if in Stata
+        if not quiet and IN_STATA and self._data_label.strip() != "":
+            print("{txt}(" + self._data_label + "){txt}")
             
         # set quiet on or off
         self._quiet = bool(quiet)
